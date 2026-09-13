@@ -37,6 +37,7 @@ import com.aaya.assistant.ui.memory.MemoryDashboardScreen
 import com.aaya.assistant.ui.permissions.PermissionWizardScreen
 import com.aaya.assistant.ui.settings.ApiSettingsScreen
 import com.aaya.assistant.ui.theme.*
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -168,8 +169,7 @@ class MainActivity : ComponentActivity() {
 
     private fun processVoiceCommand(commandText: String) {
         if (commandText.isBlank()) return
-        val scope = (application as AayaApplication)
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+        lifecycleScope.launch {
             val result = commandRouter.routeAndExecute(commandText)
             assistantState = assistantState.copy(
                 finalResponseText = result.speechResponse,

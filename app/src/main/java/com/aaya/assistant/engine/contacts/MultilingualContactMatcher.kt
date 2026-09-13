@@ -44,9 +44,7 @@ class MultilingualContactMatcher(private val context: Context) {
             }
         }
 
-        // 2. Check VIP Contacts table
-        val vipList = db.aayaDao().getAllVipContacts()
-        // Check direct alias mapping
+        // 2. Check direct alias mapping
         var matchedRelationKey: String? = null
         val aliasSearchKeys = mutableListOf(cleanedTarget)
 

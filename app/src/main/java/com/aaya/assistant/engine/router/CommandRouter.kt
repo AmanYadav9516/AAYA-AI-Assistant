@@ -100,7 +100,11 @@ class CommandRouter(
         }
 
         // 6. COMPLEX / AI ROUTE: Forward to Gemini AI Brain with Tool Calling
-        val userMemories = db.aayaDao().getAllMemoryByCategory("routine")
+        val userMemories = try {
+            db.aayaDao().getMemoryByCategory("routine")
+        } catch (e: Exception) {
+            emptyList()
+        }
         val contextSummary = userMemories.joinToString("; ") { "${it.key}: ${it.value}" }
 
         when (val result = geminiClient.executeVoicePrompt(query, contextSummary)) {
@@ -166,14 +170,6 @@ class CommandRouter(
             }
         } catch (e: Exception) {
             // Ignore parse failure
-        }
-    }
-
-    private suspend fun AayaDatabase.getAllMemoryByCategory(category: String): List<MemoryItem> {
-        return try {
-            aayaDao().getMemoryByCategory(category)
-        } catch (e: Exception) {
-            emptyList()
         }
     }
 }
