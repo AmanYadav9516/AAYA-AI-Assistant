@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">AAYA</string>
+    <string name="assistant_tagline">Next-Gen Voice &amp; Lifestyle Intelligence</string>
+    <string name="wake_word">Hey AAYA</string>
+    <string name="listening">Listening to you…</string>
+    <string name="tap_to_speak">Tap orb or shake device to speak</string>
+</resources>
