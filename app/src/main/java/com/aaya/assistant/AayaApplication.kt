@@ -20,10 +20,23 @@ class AayaApplication : Application() {
         super.onCreate()
         instance = this
 
-        preferenceManager = PreferenceManager(this)
-        database = AayaDatabase.getInstance(this)
+        try {
+            preferenceManager = PreferenceManager(this)
+        } catch (t: Throwable) {
+            // Safeguarded
+        }
 
-        createNotificationChannels()
+        try {
+            database = AayaDatabase.getInstance(this)
+        } catch (t: Throwable) {
+            // Safeguarded
+        }
+
+        try {
+            createNotificationChannels()
+        } catch (t: Throwable) {
+            // Safeguarded
+        }
     }
 
     private fun createNotificationChannels() {

@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!-- System Control & Hardware Permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -85,8 +86,11 @@
             android:name=".engine.sensor.ShakeDetectorService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="specialUse"
-            tools:ignore="ForegroundServicePermission" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Shake detection for AI Assistant activation" />
+        </service>
 
         <!-- Auto-restart Shake Service on boot -->
         <receiver

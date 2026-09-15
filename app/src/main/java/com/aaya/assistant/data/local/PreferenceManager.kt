@@ -16,8 +16,8 @@ class PreferenceManager(context: Context) {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
-    } catch (e: Exception) {
-        // Fallback for older test environments or devices without Hardware Keystore
+    } catch (t: Throwable) {
+        // Fallback for older test environments or devices with Keystore exceptions
         context.getSharedPreferences("aaya_standard_prefs", Context.MODE_PRIVATE)
     }
 

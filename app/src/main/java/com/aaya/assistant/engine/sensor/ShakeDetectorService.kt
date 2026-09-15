@@ -43,7 +43,19 @@ class ShakeDetectorService : Service(), SensorEventListener {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
         }
 
-        startForeground(NOTIFICATION_ID, buildForegroundNotification())
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildForegroundNotification(),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildForegroundNotification())
+            }
+        } catch (t: Throwable) {
+            // Gracefully catch any security or notification exceptions on Android 14
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -124,11 +136,15 @@ class ShakeDetectorService : Service(), SensorEventListener {
         private const val SHAKE_DEBOUNCE_MS = 1200L
 
         fun start(context: Context) {
-            val intent = Intent(context, ShakeDetectorService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val intent = Intent(context, ShakeDetectorService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (t: Throwable) {
+                // Safeguard against background start restrictions
             }
         }
 

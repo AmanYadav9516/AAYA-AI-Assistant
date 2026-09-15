@@ -105,8 +105,12 @@ class MainActivity : ComponentActivity() {
         commandRouter = CommandRouter(this, ttsManager, geminiClient, contactMatcher)
 
         // Start background shake detector service if enabled
-        if (prefs.isShakeEnabled) {
-            ShakeDetectorService.start(this)
+        try {
+            if (prefs.isShakeEnabled) {
+                ShakeDetectorService.start(this)
+            }
+        } catch (t: Throwable) {
+            // Safeguarded against Android 14 FGS restrictions
         }
 
         handleVoiceTriggerIntent(intent)
