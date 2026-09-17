@@ -207,23 +207,15 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
 
     private fun buildRequest(apiKey: String, payload: JSONObject): Request {
         val requestBody = payload.toString().toRequestBody(jsonMediaType)
+        val cleanKey = apiKey.trim()
 
-        return if (apiKey.startsWith("AIzaSy")) {
-            // Standard Google AI Studio Gemini API Key via query param
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
-            Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
-        } else {
-            // OAuth, Bearer token, or direct token
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-            Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer $apiKey")
-                .post(requestBody)
-                .build()
-        }
+        // Google Gemini API standard: accepts all keys via x-goog-api-key header & URL query param
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanKey"
+        return Request.Builder()
+            .url(url)
+            .addHeader("x-goog-api-key", cleanKey)
+            .post(requestBody)
+            .build()
     }
 
     private fun buildSystemPrompt(userContext: String): String {

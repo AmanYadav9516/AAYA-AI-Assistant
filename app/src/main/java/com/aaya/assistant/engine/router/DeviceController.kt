@@ -51,6 +51,42 @@ class DeviceController(private val context: Context) {
         }
     }
 
+    fun openSettings(): Boolean {
+        return try {
+            val intent = Intent(android.provider.Settings.ACTION_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun openWifiSettings(): Boolean {
+        return try {
+            val intent = Intent(android.provider.Settings.ACTION_WIFI_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun openBluetoothSettings(): Boolean {
+        return try {
+            val intent = Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     fun placeCall(phoneNumber: String): Boolean {
         return try {
             val callIntent = Intent(Intent.ACTION_CALL).apply {

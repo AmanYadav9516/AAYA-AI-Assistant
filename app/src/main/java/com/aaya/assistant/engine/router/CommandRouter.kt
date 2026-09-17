@@ -30,33 +30,56 @@ class CommandRouter(
         val query = rawSpokenText.trim()
         val lower = query.lowercase()
 
-        // 1. FAST LOCAL ROUTE: Flashlight / Torch
-        if (lower.contains("torch on") || lower.contains("flashlight on") || lower.contains("torch jalao")) {
-            val ok = deviceController.toggleFlashlight(true)
-            val msg = if (ok) "Flashlight turned on." else "Flashlight couldn't be turned on."
+        // 1. FAST LOCAL ROUTE: Flashlight / Torch (100% Offline)
+        val isTorchCommand = lower.contains("torch") || lower.contains("flashlight")
+        if (isTorchCommand) {
+            val isOff = lower.contains("off") || lower.contains("band") || lower.contains("stop") || lower.contains("close")
+            val isOn = lower.contains("on") || lower.contains("turn on") || lower.contains("jalao") || lower.contains("chalu") || lower.contains("start") || !isOff
+            val ok = deviceController.toggleFlashlight(isOn)
+            val msg = if (isOn) {
+                if (ok) "Flashlight turned on." else "Flashlight couldn't be turned on."
+            } else {
+                if (ok) "Flashlight turned off." else "Flashlight couldn't be turned off."
+            }
             speak(msg)
-            return@withContext ExecutionResult(msg, "Flashlight ON", handledLocally = true)
-        }
-        if (lower.contains("torch off") || lower.contains("flashlight off") || lower.contains("torch band")) {
-            val ok = deviceController.toggleFlashlight(false)
-            val msg = if (ok) "Flashlight turned off." else "Flashlight couldn't be turned off."
-            speak(msg)
-            return@withContext ExecutionResult(msg, "Flashlight OFF", handledLocally = true)
+            return@withContext ExecutionResult(msg, if (isOn) "Flashlight ON" else "Flashlight OFF", handledLocally = true)
         }
 
-        // 2. FAST LOCAL ROUTE: Volume
-        if (lower.contains("volume up") || lower.contains("awaz badhao")) {
+        // 2. FAST LOCAL ROUTE: Settings & Connectivity (100% Offline)
+        if (lower.contains("setting") || lower.contains("settings")) {
+            deviceController.openSettings()
+            val msg = "Opening Settings."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Open Settings", handledLocally = true)
+        }
+
+        if (lower.contains("wi-fi") || lower.contains("wifi") || lower.contains("wi fi")) {
+            deviceController.openWifiSettings()
+            val msg = "Opening Wi-Fi Settings."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Wi-Fi Settings", handledLocally = true)
+        }
+
+        if (lower.contains("bluetooth") || lower.contains("blutooth") || lower.contains("blooth")) {
+            deviceController.openBluetoothSettings()
+            val msg = "Opening Bluetooth Settings."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Bluetooth Settings", handledLocally = true)
+        }
+
+        // 3. FAST LOCAL ROUTE: Volume
+        if (lower.contains("volume up") || lower.contains("awaz badhao") || lower.contains("sound up")) {
             deviceController.adjustVolume(increase = true)
             speak("Volume increased.")
             return@withContext ExecutionResult("Volume increased.", "Volume UP", handledLocally = true)
         }
-        if (lower.contains("volume down") || lower.contains("awaz kam karo")) {
+        if (lower.contains("volume down") || lower.contains("awaz kam karo") || lower.contains("sound down")) {
             deviceController.adjustVolume(increase = false)
             speak("Volume decreased.")
             return@withContext ExecutionResult("Volume decreased.", "Volume DOWN", handledLocally = true)
         }
 
-        // 3. FAST LOCAL ROUTE: Calling & Multilingual Contact Match
+        // 4. FAST LOCAL ROUTE: Calling & Multilingual Contact Match
         if (lower.startsWith("call") || lower.contains("ko call") || lower.contains("ko phone") || lower.contains("phone lagao")) {
             val target = contactMatcher.extractTargetName(query)
             val match = contactMatcher.resolveAndFindContact(target)
@@ -74,7 +97,7 @@ class CommandRouter(
             }
         }
 
-        // 4. FAST LOCAL ROUTE: Quick App Launch ("Open WhatsApp", "Open YouTube")
+        // 5. FAST LOCAL ROUTE: Quick App Launch ("Open WhatsApp", "Open YouTube")
         if (lower.startsWith("open ") || lower.startsWith("kholo ")) {
             val appName = lower.removePrefix("open ").removePrefix("kholo ").trim()
             val opened = deviceController.openAppByName(appName)
@@ -85,7 +108,7 @@ class CommandRouter(
             }
         }
 
-        // 5. FAST LOCAL ROUTE: Modes (Sleep / DND / Normal)
+        // 6. FAST LOCAL ROUTE: Modes (Sleep / DND / Normal)
         if (lower.contains("sleep mode on") || lower.contains("so raha hu") || lower.contains("sleeping mode")) {
             deviceController.setDoNotDisturb(true)
             val msg = "Sleep mode activated. Alarms and VIP calls remain active."
