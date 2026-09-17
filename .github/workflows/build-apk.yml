@@ -47,29 +47,33 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create v1.0.2 \
-            app/build/outputs/apk/debug/app-debug.apk \
-            AAYA-Assistant.zip \
-            --title "AAYA AI Assistant v1.0.2 APK (API Auth & Offline Routing Fix)" \
-            --clobber \
-            --notes "## 🌟 AAYA v1.0.2 — API Auth & Offline Routing Update
+          cat << 'EOF' > release_notes.md
+          ## 🌟 AAYA v1.0.2 — API Auth & Offline Routing Update
 
           ### 📲 Direct 1-Click Download Links:
           * **[Download AAYA v1.0.2 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v1.0.2/app-debug.apk)**
           * **[Download AAYA v1.0.2 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v1.0.2/AAYA-Assistant.zip)**
 
           ### Fixes included in v1.0.2:
-          - 🔑 **API Auth 401 Fix**: Uses official \`x-goog-api-key\` header & query param for all Google AI Studio keys (\`AIzaSy...\` & \`AQ...\`).
-          - 🔦 **100% Offline Torch/Flashlight**: Matches flexible phrasing (\"Turn on torch\", \"Torch on\", \"Torch jalao\") locally without internet.
+          - 🔑 **API Auth 401 Fix**: Uses official `x-goog-api-key` header & query param for all Google AI Studio keys (`AIzaSy...` & `AQ...`).
+          - 🔦 **100% Offline Torch/Flashlight**: Matches flexible phrasing ("Turn on torch", "Torch on", "Torch jalao") locally without internet.
           - ⚙️ **100% Offline Settings & Wi-Fi**: Directly launches Settings & Wi-Fi controls locally.
 
           ### Included in this build:
           - 🎙️ **Streaming Speech Recognition & Interruption (Barge-in)**
           - 📳 **Shake to Wake** (Active only when device screen is ON)
           - ⚡ **Fast Local Command Router (<50ms)** + **Gemini AI Brain (Tool Calling)**
-          - 👥 **Multilingual Contact Understanding** (Hinglish/Hindi/English: \"Mummy ko call karo\", \"Papa ko phone lagao\")
+          - 👥 **Multilingual Contact Understanding** (Hinglish/Hindi/English: "Mummy ko call karo", "Papa ko phone lagao")
           - 🌙 **Lifestyle Intelligence** (Sleep Mode, Class/Study Mode, VIP Contact Call Bypass)
           - 🚨 **Emergency Double-Call Rule** (2 calls within 3 mins rings through DND)
           - 🛡️ **Dynamic 5-Step Permission Wizard** (Real-time ❌ to ✅ status updates)
           - 🧠 **User-Controlled Memory Dashboard** (View, edit, or forget anything)
-          - ⚙️ **Live API Diagnostics & Ping** (Live status, latency, request counter)"
+          - ⚙️ **Live API Diagnostics & Ping** (Live status, latency, request counter)
+          EOF
+
+          gh release delete v1.0.2 --yes || true
+          gh release create v1.0.2 \
+            app/build/outputs/apk/debug/app-debug.apk \
+            AAYA-Assistant.zip \
+            --title "AAYA AI Assistant v1.0.2 APK (API Auth & Offline Routing Fix)" \
+            --notes-file release_notes.md
