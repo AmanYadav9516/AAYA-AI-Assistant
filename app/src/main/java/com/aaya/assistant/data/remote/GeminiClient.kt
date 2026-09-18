@@ -40,6 +40,13 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
+    // Multi-turn conversational memory buffer (holds recent turns for context)
+    private val conversationHistory = mutableListOf<JSONObject>()
+
+    fun clearHistory() {
+        conversationHistory.clear()
+    }
+
     suspend fun testConnection(): ApiDiagnostics = withContext(Dispatchers.IO) {
         val apiKey = preferenceManager.apiKey.ifEmpty { DEFAULT_FALLBACK_KEY }
         if (apiKey.isBlank()) {
@@ -117,9 +124,26 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
         systemContext: String = ""
     ): GeminiResult = withContext(Dispatchers.IO) {
         val apiKey = preferenceManager.apiKey.ifEmpty { DEFAULT_FALLBACK_KEY }
+        if (apiKey.isBlank()) {
+            return@withContext GeminiResult.Error("API Key missing. Please set it in Settings.")
+        }
+
         val startTime = System.currentTimeMillis()
 
         try {
+            // Build multi-turn contents
+            val contentsArray = JSONArray()
+            for (prevTurn in conversationHistory) {
+                contentsArray.put(prevTurn)
+            }
+            val currentTurn = JSONObject().apply {
+                put("role", "user")
+                put("parts", JSONArray().apply {
+                    put(JSONObject().put("text", userQuery))
+                })
+            }
+            contentsArray.put(currentTurn)
+
             val rootJson = JSONObject().apply {
                 // System Instruction
                 put("systemInstruction", JSONObject().apply {
@@ -128,15 +152,7 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
                     })
                 })
 
-                // Contents
-                put("contents", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().put("text", userQuery))
-                        })
-                    })
-                })
+                put("contents", contentsArray)
 
                 // Tool Declarations
                 put("tools", buildToolDeclarations())
@@ -191,8 +207,24 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
                     }
                 }
 
+                val finalResponseText = textBuilder.toString().trim()
+
+                // Save turn to multi-turn conversation history
+                conversationHistory.add(currentTurn)
+                if (finalResponseText.isNotEmpty()) {
+                    conversationHistory.add(JSONObject().apply {
+                        put("role", "model")
+                        put("parts", JSONArray().apply {
+                            put(JSONObject().put("text", finalResponseText))
+                        })
+                    })
+                }
+                while (conversationHistory.size > 8) {
+                    conversationHistory.removeAt(0)
+                }
+
                 GeminiResult.Success(
-                    responseText = textBuilder.toString().trim(),
+                    responseText = finalResponseText,
                     functionCalls = functionCalls,
                     latencyMs = latency
                 )
@@ -210,7 +242,8 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
         val cleanKey = apiKey.trim()
 
         // Google Gemini API standard: accepts all keys via x-goog-api-key header & URL query param
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanKey"
+        // Upgraded to gemini-3.6-flash for fast, active, error-free execution
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL_NAME:generateContent?key=$cleanKey"
         return Request.Builder()
             .url(url)
             .addHeader("x-goog-api-key", cleanKey)
@@ -220,11 +253,11 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
 
     private fun buildSystemPrompt(userContext: String): String {
         return """
-            You are AAYA, a world-class voice assistant for Android.
-            Your answers are concise, friendly, and optimized for voice synthesis (TTS).
-            Never reply with long paragraphs. Keep voice responses under 1-2 sentences.
-            Understand multilingual phrases in English, Hindi, and Hinglish (e.g., 'Mummy ko call karo', 'Papa ko phone lagao', 'Silent mode on karo').
-            When a user requests a device action (calling, opening apps, setting alarms, turning on flashlight, sleep mode), always call the appropriate tool.
+            You are AAYA, an elite voice and lifestyle AI assistant for Android.
+            Your answers are concise, friendly, and optimized for voice speech (TTS).
+            Keep spoken voice answers under 1-2 sentences. Never reply with verbose paragraphs.
+            Understand multilingual phrases in English, Hindi, and Hinglish (e.g., 'Mummy ko call karo', 'Papa ko phone lagao', 'Silent mode on karo', 'Ye note save karo').
+            When a user requests one or multiple device actions (e.g. 'Set alarm for 7, turn on torch, and activate sleep mode'), invoke all relevant function calls simultaneously.
             
             Current User Lifestyle & Memory Context:
             $userContext
@@ -317,12 +350,122 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
                             put("required", JSONArray().put("key").put("value"))
                         })
                     })
+
+                    // Smart Notes
+                    put(JSONObject().apply {
+                        put("name", "save_note")
+                        put("description", "Create and save a smart note with category")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("content", JSONObject().put("type", "string").put("description", "Content of the note"))
+                                put("title", JSONObject().put("type", "string").put("description", "Short title"))
+                                put("category", JSONObject().put("type", "string").put("description", "'Notes', 'Shopping', 'Ideas', 'College', 'Personal', 'Important'"))
+                            })
+                            put("required", JSONArray().put("content"))
+                        })
+                    })
+
+                    // Shopping List Manager
+                    put(JSONObject().apply {
+                        put("name", "manage_shopping_list")
+                        put("description", "Add, remove, mark purchased, or read shopping list items")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("action", JSONObject().put("type", "string").put("description", "'add', 'remove', 'mark_done', 'list'"))
+                                put("items", JSONObject().put("type", "string").put("description", "Item names e.g. 'milk, bread, eggs'"))
+                            })
+                            put("required", JSONArray().put("action"))
+                        })
+                    })
+
+                    // Time-Based Scheduled Action
+                    put(JSONObject().apply {
+                        put("name", "schedule_action")
+                        put("description", "Schedule an action or reminder for a specific future time or delay")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("title", JSONObject().put("type", "string").put("description", "Reminder title"))
+                                put("time_string", JSONObject().put("type", "string").put("description", "Target time e.g. '12:00 PM', 'in 30 minutes', 'tomorrow 8:00 AM'"))
+                                put("task_type", JSONObject().put("type", "string").put("description", "'CALL_REMINDER', 'STUDY_REMINDER', 'CUSTOM_REMINDER'"))
+                                put("target_contact", JSONObject().put("type", "string").put("description", "Contact name to call or message if applicable"))
+                            })
+                            put("required", JSONArray().put("title").put("time_string"))
+                        })
+                    })
+
+                    // Study Timer
+                    put(JSONObject().apply {
+                        put("name", "start_study_timer")
+                        put("description", "Start a focused study session timer with DND and automatic break")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("duration_minutes", JSONObject().put("type", "integer").put("description", "Duration in minutes (e.g. 45 or 120)"))
+                                put("topic", JSONObject().put("type", "string").put("description", "Subject or topic name (e.g. Robotics, Math)"))
+                            })
+                            put("required", JSONArray().put("duration_minutes"))
+                        })
+                    })
+
+                    // Camera Assistant
+                    put(JSONObject().apply {
+                        put("name", "camera_action")
+                        put("description", "Take photo, take selfie, record video, or start camera timer")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("mode", JSONObject().put("type", "string").put("description", "'photo', 'selfie', 'video', 'timer_10s'"))
+                            })
+                            put("required", JSONArray().put("mode"))
+                        })
+                    })
+
+                    // Web Search
+                    put(JSONObject().apply {
+                        put("name", "web_search")
+                        put("description", "Search the web or look up information online")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("query", JSONObject().put("type", "string").put("description", "Search query"))
+                            })
+                            put("required", JSONArray().put("query"))
+                        })
+                    })
+
+                    // Audit Log Query
+                    put(JSONObject().apply {
+                        put("name", "query_audit_log")
+                        put("description", "Answer 'what did you do today?' with an itemized breakdown of assistant actions")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("time_frame", JSONObject().put("type", "string").put("description", "'today'"))
+                            })
+                        })
+                    })
+
+                    // Daily Planner Query
+                    put(JSONObject().apply {
+                        put("name", "query_daily_plan")
+                        put("description", "Summarize the user's upcoming classes, reminders, alarms, and tasks for today or tomorrow")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("day", JSONObject().put("type", "string").put("description", "'today' or 'tomorrow'"))
+                            })
+                        })
+                    })
                 })
             })
         }
     }
 
     companion object {
+        const val MODEL_NAME = "gemini-3.6-flash"
         const val DEFAULT_FALLBACK_KEY = ""
     }
 }

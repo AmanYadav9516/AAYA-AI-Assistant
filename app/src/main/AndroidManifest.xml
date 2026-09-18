@@ -32,6 +32,8 @@
     <!-- Clock & Alarms -->
     <uses-permission android:name="android.permission.SET_ALARM" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <!-- Network & Internet for Gemini AI -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -103,6 +105,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Scheduled Task & Reminder Receiver -->
+        <receiver
+            android:name=".engine.scheduler.ScheduledTaskReceiver"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>

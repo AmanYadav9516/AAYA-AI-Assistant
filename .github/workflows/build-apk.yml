@@ -48,32 +48,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat << 'EOF' > release_notes.md
-          ## 🌟 AAYA v1.0.2 — API Auth & Offline Routing Update
+          ## 🌟 AAYA v1.0.3 — Premium Intelligence & Gemini 3.6 Flash Upgrade
 
           ### 📲 Direct 1-Click Download Links:
-          * **[Download AAYA v1.0.2 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v1.0.2/app-debug.apk)**
-          * **[Download AAYA v1.0.2 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v1.0.2/AAYA-Assistant.zip)**
+          * **[Download AAYA v1.0.3 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v1.0.3/app-debug.apk)**
+          * **[Download AAYA v1.0.3 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v1.0.3/AAYA-Assistant.zip)**
 
-          ### Fixes included in v1.0.2:
-          - 🔑 **API Auth 401 Fix**: Uses official `x-goog-api-key` header & query param for all Google AI Studio keys (`AIzaSy...` & `AQ...`).
-          - 🔦 **100% Offline Torch/Flashlight**: Matches flexible phrasing ("Turn on torch", "Torch on", "Torch jalao") locally without internet.
-          - ⚙️ **100% Offline Settings & Wi-Fi**: Directly launches Settings & Wi-Fi controls locally.
-
-          ### Included in this build:
-          - 🎙️ **Streaming Speech Recognition & Interruption (Barge-in)**
-          - 📳 **Shake to Wake** (Active only when device screen is ON)
-          - ⚡ **Fast Local Command Router (<50ms)** + **Gemini AI Brain (Tool Calling)**
-          - 👥 **Multilingual Contact Understanding** (Hinglish/Hindi/English: "Mummy ko call karo", "Papa ko phone lagao")
-          - 🌙 **Lifestyle Intelligence** (Sleep Mode, Class/Study Mode, VIP Contact Call Bypass)
-          - 🚨 **Emergency Double-Call Rule** (2 calls within 3 mins rings through DND)
-          - 🛡️ **Dynamic 5-Step Permission Wizard** (Real-time ❌ to ✅ status updates)
-          - 🧠 **User-Controlled Memory Dashboard** (View, edit, or forget anything)
-          - ⚙️ **Live API Diagnostics & Ping** (Live status, latency, request counter)
+          ### 🚀 What's New in v1.0.3:
+          - ⚡ **Gemini 3.6 Flash Engine**: Completely resolved 404 model error; full, native support for all Google AI Studio developer keys (`AQ...` and `AIzaSy...`).
+          - 🔄 **Multi-Turn Follow-Up Conversations**: Maintains conversational history across turns ("Set alarm for 7" -> "What should I name it?" -> "College").
+          - 🧠 **Multi-Action Commands**: Executes complex multi-step voice requests ("Set alarm for 7, turn on torch, and activate sleep mode").
+          - 🔐 **Permission-Aware AI**: Contextual, friendly voice guidance instead of errors when permissions are missing ("I need Contacts access to identify Mummy...").
+          - 🧾 **Trust & Audit Log ("What did you do today?")**: Transparent tracking of every alarm, note, call, focus session, and AI request performed on your device.
+          - 📝 **Smart Notes & Shopping Lists**: Save notes by category (College, Ideas, Personal, Notes) and manage shopping items with voice ("Add milk and eggs", "What is on my shopping list?", "Mark eggs as purchased").
+          - 📷 **Camera Assistant**: Take photos, selfies, record videos, or trigger a 10-second photo timer via voice.
+          - ⏰ **Time-Based Scheduled Actions & Calls**: Schedule future reminders and call prompts ("At 12 PM call Mom", "In 30 minutes remind me to study") via AlarmManager.
+          - 🎓 **Student Mode, Daily Planner & Study Focus Timer**: Ask "Plan my day", start timed focus study sessions with automatic DND, and manage class timetables.
+          - 📊 **Personal Dashboard UI**: Redesigned Home screen with dynamic time-based greetings, Next Up card, quick action chips, and privacy status.
+          - 🛡️ **100% On-Device Local Data Storage**: All notes, shopping lists, schedules, and memories stay strictly on the user's phone.
           EOF
 
-          gh release delete v1.0.2 --yes || true
-          gh release create v1.0.2 \
+          gh release delete v1.0.3 --yes || true
+          gh release create v1.0.3 \
             app/build/outputs/apk/debug/app-debug.apk \
             AAYA-Assistant.zip \
-            --title "AAYA AI Assistant v1.0.2 APK (API Auth & Offline Routing Fix)" \
+            --title "AAYA AI Assistant v1.0.3 APK (Gemini 3.6 Flash & Premium Features)" \
             --notes-file release_notes.md
