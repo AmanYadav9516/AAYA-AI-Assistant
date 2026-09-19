@@ -77,4 +77,8 @@ object QuoteLibrary {
         val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
         return quotes[dayOfYear % quotes.size]
     }
+
+    fun getRandomQuote(): Quote {
+        return quotes.random()
+    }
 }

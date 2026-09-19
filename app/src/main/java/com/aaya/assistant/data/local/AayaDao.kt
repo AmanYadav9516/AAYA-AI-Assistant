@@ -134,6 +134,9 @@ interface AayaDao {
     @Query("SELECT * FROM aaya_expenses WHERE timestamp >= :sinceEpochMs ORDER BY timestamp DESC")
     suspend fun getExpensesSince(sinceEpochMs: Long): List<com.aaya.assistant.data.model.ExpenseItem>
 
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM aaya_expenses WHERE timestamp >= :sinceEpochMs")
+    suspend fun getTotalExpensesSince(sinceEpochMs: Long): Double?
+
     @Delete
     suspend fun deleteExpense(expense: com.aaya.assistant.data.model.ExpenseItem)
 }
