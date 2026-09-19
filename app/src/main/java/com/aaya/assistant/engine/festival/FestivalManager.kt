@@ -135,4 +135,8 @@ object FestivalManager {
             context.startActivity(chooser)
         }
     }
+
+    fun shareFestivalGreeting(context: Context, festival: FestivalModel) {
+        shareGreetingOnWhatsApp(context, festival, "all")
+    }
 }

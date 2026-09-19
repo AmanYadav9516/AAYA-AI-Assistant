@@ -13,4 +13,9 @@ data class FestivalModel(
     val friendWish: String,
     val generalWishHindi: String,
     val generalWishEnglish: String
-)
+) {
+    val title: String get() = "$name ($hindiName)"
+    val dateString: String get() = "$dayOfMonth/$month"
+    val wishesHindi: String get() = generalWishHindi
+    val wishesEnglish: String get() = generalWishEnglish
+}

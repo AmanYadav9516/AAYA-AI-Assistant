@@ -10,5 +10,6 @@ data class ExpenseItem(
     val amount: Double,
     val category: String, // "Food", "Travel", "College", "Shopping", "Bills", "General"
     val note: String = "",
+    val description: String = note,
     val timestamp: Long = System.currentTimeMillis()
 )
