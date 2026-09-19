@@ -61,6 +61,34 @@ class PreferenceManager(context: Context) {
         get() = securePrefs.getString(KEY_LAST_ERROR, null)
         set(value) = securePrefs.edit().putString(KEY_LAST_ERROR, value).apply()
 
+    var userName: String
+        get() = securePrefs.getString(KEY_USER_NAME, "Manish") ?: "Manish"
+        set(value) = securePrefs.edit().putString(KEY_USER_NAME, value.trim()).apply()
+
+    var voicePitch: Float
+        get() = securePrefs.getFloat(KEY_VOICE_PITCH, 1.0f)
+        set(value) = securePrefs.edit().putFloat(KEY_VOICE_PITCH, value).apply()
+
+    var voiceSpeed: Float
+        get() = securePrefs.getFloat(KEY_VOICE_SPEED, 1.0f)
+        set(value) = securePrefs.edit().putFloat(KEY_VOICE_SPEED, value).apply()
+
+    var voicePreset: String
+        get() = securePrefs.getString(KEY_VOICE_PRESET, "FEMALE") ?: "FEMALE"
+        set(value) = securePrefs.edit().putString(KEY_VOICE_PRESET, value).apply()
+
+    var aiProvider: String
+        get() = securePrefs.getString(KEY_AI_PROVIDER, "GEMINI") ?: "GEMINI"
+        set(value) = securePrefs.edit().putString(KEY_AI_PROVIDER, value).apply()
+
+    var openRouterApiKey: String
+        get() = securePrefs.getString(KEY_OPENROUTER_KEY, "") ?: ""
+        set(value) = securePrefs.edit().putString(KEY_OPENROUTER_KEY, value.trim()).apply()
+
+    var isWaterReminderEnabled: Boolean
+        get() = securePrefs.getBoolean(KEY_WATER_REMINDER, true)
+        set(value) = securePrefs.edit().putBoolean(KEY_WATER_REMINDER, value).apply()
+
     companion object {
         private const val KEY_API_KEY = "gemini_api_key"
         private const val KEY_ASSISTANT_NAME = "assistant_name"
@@ -72,5 +100,13 @@ class PreferenceManager(context: Context) {
         private const val KEY_SUCCESS_API_REQUESTS = "success_api_requests"
         private const val KEY_LAST_LATENCY_MS = "last_latency_ms"
         private const val KEY_LAST_ERROR = "last_error"
+
+        private const val KEY_USER_NAME = "user_name"
+        private const val KEY_VOICE_PITCH = "voice_pitch"
+        private const val KEY_VOICE_SPEED = "voice_speed"
+        private const val KEY_VOICE_PRESET = "voice_preset"
+        private const val KEY_AI_PROVIDER = "ai_provider"
+        private const val KEY_OPENROUTER_KEY = "openrouter_api_key"
+        private const val KEY_WATER_REMINDER = "water_reminder_enabled"
     }
 }

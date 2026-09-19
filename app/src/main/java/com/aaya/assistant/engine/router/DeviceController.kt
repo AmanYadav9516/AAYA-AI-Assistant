@@ -319,4 +319,67 @@ class DeviceController(private val context: Context) {
             false
         }
     }
+
+    // WhatsApp Integration
+    fun openWhatsApp(message: String, contactName: String? = null): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                setPackage("com.whatsapp")
+                putExtra(Intent.EXTRA_TEXT, message)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            try {
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, message)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(Intent.createChooser(sendIntent, "Share message").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+                true
+            } catch (ex: Exception) {
+                false
+            }
+        }
+    }
+
+    // SOS Emergency Strobe Flashlight
+    @Volatile
+    private var isStrobeRunning = false
+    private var strobeThread: Thread? = null
+
+    fun startStrobeBeacon(durationSec: Int = 12) {
+        if (isStrobeRunning) return
+        isStrobeRunning = true
+        strobeThread = Thread {
+            val endTime = System.currentTimeMillis() + (durationSec * 1000L)
+            var state = false
+            while (isStrobeRunning && System.currentTimeMillis() < endTime) {
+                state = !state
+                toggleFlashlight(state)
+                try {
+                    Thread.sleep(150)
+                } catch (e: InterruptedException) {
+                    break
+                }
+            }
+            toggleFlashlight(false)
+            isStrobeRunning = false
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    fun stopStrobeBeacon() {
+        isStrobeRunning = false
+        strobeThread?.interrupt()
+        strobeThread = null
+        toggleFlashlight(false)
+    }
 }

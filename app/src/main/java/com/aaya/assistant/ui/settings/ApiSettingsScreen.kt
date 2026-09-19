@@ -30,14 +30,26 @@ fun ApiSettingsScreen() {
     val geminiClient = remember { GeminiClient(prefs) }
 
     var apiKeyInput by remember { mutableStateOf(prefs.apiKey.ifEmpty { GeminiClient.DEFAULT_FALLBACK_KEY }) }
+    var openRouterKeyInput by remember { mutableStateOf(prefs.openRouterApiKey) }
+    var aiProvider by remember { mutableStateOf(prefs.aiProvider) }
+    var userNameInput by remember { mutableStateOf(prefs.userName) }
     var assistantNameInput by remember { mutableStateOf(prefs.assistantName) }
     var isShakeEnabled by remember { mutableStateOf(prefs.isShakeEnabled) }
     var shakeSensitivity by remember { mutableFloatStateOf(prefs.shakeSensitivity) }
     var isAutoSleep by remember { mutableStateOf(prefs.isAutoSleepEnabled) }
     var isDrivingAuto by remember { mutableStateOf(prefs.isDrivingModeAuto) }
+    var isWaterReminder by remember { mutableStateOf(prefs.isWaterReminderEnabled) }
 
+    var showVoiceDialog by remember { mutableStateOf(false) }
     var isTestingConnection by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<ApiDiagnostics?>(null) }
+
+    if (showVoiceDialog) {
+        VoiceCustomizerDialog(
+            ttsManager = null,
+            onDismiss = { showVoiceDialog = false }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -47,16 +59,65 @@ fun ApiSettingsScreen() {
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "⚙️ Settings & Diagnostics",
+            text = "⚙️ Settings & Companion",
             style = MaterialTheme.typography.headlineLarge,
             color = TextPrimary
         )
         Text(
-            text = "Configure your AI Brain, Shake sensitivity, and test live API connectivity.",
+            text = "Personalize your companion, customize voice, and configure AI brain.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary,
             modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
         )
+
+        // User Profile & Voice Persona Card
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = GlassSurface),
+            modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = NeonCyan)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("User Profile & Voice Persona", fontWeight = FontWeight.Bold, color = TextPrimary)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = userNameInput,
+                    onValueChange = {
+                        userNameInput = it
+                        prefs.userName = it
+                    },
+                    label = { Text("Your Name (e.g. Manish)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = NeonCyan,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextSecondary
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Voice Studio Launcher Button
+                Button(
+                    onClick = { showVoiceDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = RadiantPurple),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = TextPrimary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Open Voice Studio (${prefs.voicePreset})", color = TextPrimary, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // API Key Section Card
         Card(
@@ -73,21 +134,72 @@ fun ApiSettingsScreen() {
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                OutlinedTextField(
-                    value = apiKeyInput,
-                    onValueChange = {
-                        apiKeyInput = it
-                        prefs.apiKey = it
-                    },
-                    label = { Text("Gemini API Key or Bearer Token") },
-                    singleLine = true,
+                // AI Engine Selection
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = NeonCyan,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextSecondary
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = aiProvider.uppercase() == "GEMINI",
+                        onClick = {
+                            aiProvider = "GEMINI"
+                            prefs.aiProvider = "GEMINI"
+                        },
+                        label = { Text("Google Gemini") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = RadiantPurple,
+                            selectedLabelColor = TextPrimary
+                        )
                     )
-                )
+                    FilterChip(
+                        selected = aiProvider.uppercase() == "OPENROUTER",
+                        onClick = {
+                            aiProvider = "OPENROUTER"
+                            prefs.aiProvider = "OPENROUTER"
+                        },
+                        label = { Text("OpenRouter (Free)") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = NeonCyan.copy(alpha = 0.3f),
+                            selectedLabelColor = TextPrimary
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                if (aiProvider.uppercase() == "OPENROUTER") {
+                    OutlinedTextField(
+                        value = openRouterKeyInput,
+                        onValueChange = {
+                            openRouterKeyInput = it
+                            prefs.openRouterApiKey = it
+                        },
+                        label = { Text("OpenRouter API Key (sk-or-...)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonCyan,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextSecondary
+                        )
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = apiKeyInput,
+                        onValueChange = {
+                            apiKeyInput = it
+                            prefs.apiKey = it
+                        },
+                        label = { Text("Gemini API Key or Bearer Token") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonCyan,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextSecondary
+                        )
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -236,20 +348,22 @@ fun ApiSettingsScreen() {
 
                 Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
 
+                Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Driving Mode Auto-Detection", color = TextPrimary, fontSize = 14.sp)
-                        Text("Enables hands-free templates during vehicular speed", fontSize = 12.sp, color = TextSecondary)
+                        Text("💧 Water & Rest Guardian", color = TextPrimary, fontSize = 14.sp)
+                        Text("Periodic caring reminders addressing you by name to stay hydrated and rest", fontSize = 12.sp, color = TextSecondary)
                     }
                     Switch(
-                        checked = isDrivingAuto,
+                        checked = isWaterReminder,
                         onCheckedChange = {
-                            isDrivingAuto = it
-                            prefs.isDrivingModeAuto = it
+                            isWaterReminder = it
+                            prefs.isWaterReminderEnabled = it
                         },
                         colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
                     )

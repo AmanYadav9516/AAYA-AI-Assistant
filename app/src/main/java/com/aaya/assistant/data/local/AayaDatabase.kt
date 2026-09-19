@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.aaya.assistant.data.model.AuditLogItem
+import com.aaya.assistant.data.model.ExpenseItem
 import com.aaya.assistant.data.model.MemoryItem
 import com.aaya.assistant.data.model.NoteItem
 import com.aaya.assistant.data.model.RoutineModel
@@ -20,9 +21,10 @@ import com.aaya.assistant.data.model.VipContact
         NoteItem::class,
         ScheduledTask::class,
         TimetableEntry::class,
-        AuditLogItem::class
+        AuditLogItem::class,
+        ExpenseItem::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AayaDatabase : RoomDatabase() {

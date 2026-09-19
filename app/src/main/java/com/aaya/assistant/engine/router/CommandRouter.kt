@@ -2,7 +2,10 @@ package com.aaya.assistant.engine.router
 
 import android.content.Context
 import com.aaya.assistant.data.local.AayaDatabase
+import com.aaya.assistant.data.local.PreferenceManager
+import com.aaya.assistant.data.local.QuoteLibrary
 import com.aaya.assistant.data.model.AuditLogItem
+import com.aaya.assistant.data.model.ExpenseItem
 import com.aaya.assistant.data.model.MemoryItem
 import com.aaya.assistant.data.model.NoteItem
 import com.aaya.assistant.data.model.ScheduledTask
@@ -11,6 +14,7 @@ import com.aaya.assistant.data.remote.GeminiClient
 import com.aaya.assistant.data.remote.GeminiResult
 import com.aaya.assistant.engine.audio.TextToSpeechManager
 import com.aaya.assistant.engine.contacts.MultilingualContactMatcher
+import com.aaya.assistant.engine.festival.FestivalManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -288,7 +292,105 @@ class CommandRouter(
             return@withContext ExecutionResult(msg, "Daily Plan ($targetDay)", handledLocally = true)
         }
 
-        // 12. COMPLEX / AI ROUTE: Forward to Gemini 3.6 Flash AI Brain with Multi-Action Tool Calling
+        // 12. FAST LOCAL ROUTE: Voice Pocket Expense Tracker ("Hisab-Kitab")
+        val isExpenseRelated = lower.contains("spent") || lower.contains("kharch") || lower.contains("rupay") ||
+                lower.contains("hisab") || lower.contains("expense") || lower.contains("rupees") || lower.contains("₹")
+        if (isExpenseRelated) {
+            val isQuery = lower.contains("kitna") || lower.contains("how much") || lower.contains("total") ||
+                    lower.contains("show") || lower.contains("batao") || lower.contains("kya hisab")
+            if (isQuery) {
+                val startOfDay = getStartOfDayMillis()
+                val totalToday = db.aayaDao().getTotalExpensesSince(startOfDay) ?: 0.0
+                val count = db.aayaDao().getExpensesSince(startOfDay).size
+                val msg = if (count > 0) {
+                    "You have spent ₹${String.format(Locale.US, "%.0f", totalToday)} across $count item${if (count > 1) "s" else ""} today."
+                } else {
+                    "You haven't recorded any expenses today."
+                }
+                speak(msg)
+                return@withContext ExecutionResult(msg, "Expense Query: ₹$totalToday", handledLocally = true)
+            } else {
+                val amount = parseExpenseAmount(query)
+                if (amount != null && amount > 0) {
+                    val category = detectExpenseCategory(query)
+                    val desc = query.replace("(?i)(record|add|save|kharcha|kharch|spent|rupay|rs|₹|amount)".toRegex(), "").trim()
+                        .ifEmpty { "$category Expense" }
+                    db.aayaDao().insertExpense(ExpenseItem(amount = amount, category = category, description = desc))
+                    logAudit("EXPENSE", "Recorded: ₹$amount for $desc ($category)")
+                    val msg = "Recorded ₹${String.format(Locale.US, "%.0f", amount)} for $desc under $category."
+                    speak(msg)
+                    return@withContext ExecutionResult(msg, "Expense: ₹$amount ($category)", handledLocally = true)
+                }
+            }
+        }
+
+        // 13. FAST LOCAL ROUTE: Daily Inspirational Quotes (Hindi + English)
+        if (lower.contains("quote") || lower.contains("suvichar") || lower.contains("vichar") ||
+                lower.contains("motivat") || lower.contains("inspire") || lower.contains("aaj ka gyan")) {
+            val quote = QuoteLibrary.getRandomQuote()
+            val msg = "${quote.hindiText} — ${quote.author}"
+            speak(msg)
+            logAudit("INSPIRATION", "Daily Quote by ${quote.author}")
+            return@withContext ExecutionResult(
+                speechResponse = msg,
+                actionSummary = "\"${quote.englishText}\" — ${quote.author}",
+                handledLocally = true
+            )
+        }
+
+        // 14. FAST LOCAL ROUTE: Festival Wishes & Greetings
+        if (lower.contains("festival") || lower.contains("tyohar") || lower.contains("diwali") ||
+                lower.contains("holi") || lower.contains("raksha bandhan") || lower.contains("eid") ||
+                lower.contains("republic day") || lower.contains("independence day")) {
+            val fest = FestivalManager.getUpcomingFestival()
+            val msg = if (fest != null) {
+                "${fest.title}! ${fest.wishesHindi}"
+            } else {
+                "Wishing you and your family vibrant, prosperous, and joyful celebrations!"
+            }
+            speak(msg)
+            logAudit("FESTIVAL", "Celebrated ${fest?.title ?: "Festivity"}")
+            return@withContext ExecutionResult(msg, fest?.title ?: "Festival Wishes", handledLocally = true)
+        }
+
+        // 15. FAST LOCAL ROUTE: Emergency SOS Strobe Beacon
+        if (lower == "sos" || lower.contains("emergency") || lower.contains("help me") || lower.contains("danger") || lower.contains("bachao")) {
+            deviceController.startStrobeBeacon(15)
+            val msg = "Emergency SOS beacon activated! Flashlight strobe is blinking."
+            speak(msg)
+            logAudit("SECURITY", "Emergency SOS Beacon Activated")
+            return@withContext ExecutionResult(msg, "SOS STROBE BEACON", handledLocally = true)
+        }
+
+        // 16. FAST LOCAL ROUTE: Voice Style Switcher
+        if (lower.contains("change voice") || lower.contains("voice change") || lower.contains("voice style") ||
+                (lower.contains("voice") && (lower.contains("male") || lower.contains("female") || lower.contains("robot") || lower.contains("child")))) {
+            val preset = when {
+                lower.contains("robot") -> "ROBOT"
+                lower.contains("child") || lower.contains("kid") -> "CHILD"
+                lower.contains("old") -> "OLD_MAN"
+                lower.contains("male") -> "MALE"
+                else -> "FEMALE"
+            }
+            ttsManager.setVoicePreset(preset)
+            val msg = "Voice style updated to $preset."
+            speak(msg)
+            logAudit("SETTINGS", "Voice Preset: $preset")
+            return@withContext ExecutionResult(msg, "Voice: $preset", handledLocally = true)
+        }
+
+        // 17. FAST LOCAL ROUTE: WhatsApp Dictation / Sharing
+        if (lower.startsWith("whatsapp ") || lower.contains("send whatsapp") || lower.contains("whatsapp message") || lower.contains("whatsapp karo")) {
+            val textToSend = query.replace("(?i)^(whatsapp|send whatsapp to|whatsapp karo|send whatsapp message)".toRegex(), "").trim()
+            val cleanText = if (textToSend.isNotBlank()) textToSend else "Hello from AAYA!"
+            deviceController.openWhatsApp(cleanText)
+            val msg = "Opening WhatsApp to send your message."
+            speak(msg)
+            logAudit("COMMUNICATION", "WhatsApp message launched")
+            return@withContext ExecutionResult(msg, "WhatsApp Dictation", handledLocally = true)
+        }
+
+        // 18. COMPLEX / AI ROUTE: Forward to Gemini 3.6 Flash AI Brain with Multi-Action Tool Calling
         val userMemories = try {
             db.aayaDao().getMemoryByCategory("routine")
         } catch (e: Exception) {
@@ -448,6 +550,52 @@ class CommandRouter(
                 logAudit("AI_REQUEST", "Web Search: $query")
                 executedSummaries.add("Searching web for $query")
             }
+            "record_expense" -> {
+                val amount = (tool.args["amount"] as? Number)?.toDouble() ?: 0.0
+                val category = tool.args["category"]?.toString() ?: "Other"
+                val desc = tool.args["description"]?.toString() ?: "Expense"
+                if (amount > 0) {
+                    db.aayaDao().insertExpense(ExpenseItem(amount = amount, category = category, description = desc))
+                    logAudit("EXPENSE", "Recorded ₹$amount for $desc ($category)")
+                    executedSummaries.add("Recorded ₹$amount for $desc")
+                }
+            }
+            "query_expenses" -> {
+                val startOfDay = getStartOfDayMillis()
+                val totalToday = db.aayaDao().getTotalExpensesSince(startOfDay) ?: 0.0
+                val count = db.aayaDao().getExpensesSince(startOfDay).size
+                executedSummaries.add("Spent ₹${String.format(Locale.US, "%.0f", totalToday)} across $count expense(s) today")
+            }
+            "send_whatsapp_message" -> {
+                val msg = tool.args["message_text"]?.toString() ?: ""
+                val contact = tool.args["contact_name"]?.toString()
+                deviceController.openWhatsApp(msg, contact)
+                logAudit("COMMUNICATION", "WhatsApp: $msg")
+                executedSummaries.add("Opened WhatsApp message")
+            }
+            "emergency_sos" -> {
+                deviceController.startStrobeBeacon(15)
+                logAudit("SECURITY", "Emergency SOS Beacon activated")
+                executedSummaries.add("SOS Strobe Beacon activated")
+            }
+            "change_voice_style" -> {
+                val preset = tool.args["preset"]?.toString() ?: "FEMALE"
+                ttsManager.setVoicePreset(preset)
+                logAudit("SETTINGS", "Voice changed to $preset")
+                executedSummaries.add("Voice style set to $preset")
+            }
+            "get_daily_quote" -> {
+                val quote = QuoteLibrary.getRandomQuote()
+                executedSummaries.add("\"${quote.hindiText}\" — ${quote.author}")
+            }
+            "festival_greeting" -> {
+                val fest = FestivalManager.getUpcomingFestival()
+                if (fest != null) {
+                    executedSummaries.add("${fest.title}: ${fest.wishesHindi}")
+                } else {
+                    executedSummaries.add("Wishing you happy and auspicious festivities!")
+                }
+            }
         }
     }
 
@@ -530,5 +678,49 @@ class CommandRouter(
     private fun getTomorrowDayName(): String {
         val cal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
         return SimpleDateFormat("EEEE", Locale.getDefault()).format(cal.time)
+    }
+
+    private fun parseExpenseAmount(text: String): Double? {
+        val patterns = listOf(
+            Regex("(?:spent|paid|kharch(?:a)?|rupay|rupees|rs|₹|cost|didi|diye)\\s*[:=]?\\s*(\\d+(?:\\.\\d+)?)", RegexOption.IGNORE_CASE),
+            Regex("(\\d+(?:\\.\\d+)?)\\s*(?:rupay|rupees|rs|₹|spent|paid|kharch)", RegexOption.IGNORE_CASE),
+            Regex("₹\\s*(\\d+(?:\\.\\d+)?)")
+        )
+        for (pattern in patterns) {
+            val match = pattern.find(text)
+            if (match != null) {
+                return match.groupValues[1].toDoubleOrNull()
+            }
+        }
+        return null
+    }
+
+    private fun detectExpenseCategory(text: String): String {
+        val lower = text.lowercase()
+        return when {
+            lower.contains("chai") || lower.contains("tea") || lower.contains("coffee") || lower.contains("food") ||
+            lower.contains("samosa") || lower.contains("lunch") || lower.contains("dinner") || lower.contains("breakfast") ||
+            lower.contains("canteen") || lower.contains("khana") || lower.contains("burger") || lower.contains("pizza") ||
+            lower.contains("snack") -> "Food"
+
+            lower.contains("auto") || lower.contains("cab") || lower.contains("taxi") || lower.contains("bus") ||
+            lower.contains("train") || lower.contains("metro") || lower.contains("petrol") || lower.contains("travel") ||
+            lower.contains("fare") || lower.contains("kiraya") || lower.contains("uber") || lower.contains("ola") -> "Travel"
+
+            lower.contains("book") || lower.contains("pen") || lower.contains("copy") || lower.contains("college") ||
+            lower.contains("assignment") || lower.contains("print") || lower.contains("xerox") || lower.contains("fees") ||
+            lower.contains("exam") || lower.contains("notes") -> "College"
+
+            lower.contains("recharge") || lower.contains("bill") || lower.contains("electricity") || lower.contains("wifi") ||
+            lower.contains("rent") -> "Bills"
+
+            lower.contains("movie") || lower.contains("game") || lower.contains("party") || lower.contains("cinema") ||
+            lower.contains("treat") -> "Entertainment"
+
+            lower.contains("shop") || lower.contains("cloth") || lower.contains("dress") || lower.contains("shoes") ||
+            lower.contains("amazon") || lower.contains("flipkart") -> "Shopping"
+
+            else -> "Other"
+        }
     }
 }

@@ -110,6 +110,23 @@
             android:name=".engine.scheduler.ScheduledTaskReceiver"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Smart Battery 100% Unplug & Care Receiver -->
+        <receiver
+            android:name=".engine.sensor.BatteryReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Proactive Hydration & Rest Guardian Receiver -->
+        <receiver
+            android:name=".engine.wellness.HydrationReceiver"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>

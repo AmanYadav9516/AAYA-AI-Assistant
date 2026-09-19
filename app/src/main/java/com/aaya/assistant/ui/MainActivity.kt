@@ -27,15 +27,20 @@ import com.aaya.assistant.AayaApplication
 import com.aaya.assistant.data.model.*
 import com.aaya.assistant.data.remote.GeminiClient
 import com.aaya.assistant.engine.audio.*
+import com.aaya.assistant.data.local.QuoteLibrary
 import com.aaya.assistant.engine.contacts.MultilingualContactMatcher
+import com.aaya.assistant.engine.festival.FestivalManager
 import com.aaya.assistant.engine.router.CommandRouter
 import com.aaya.assistant.engine.sensor.ShakeDetectorService
+import com.aaya.assistant.engine.wellness.HydrationReceiver
 import com.aaya.assistant.ui.assistant.GlowingVoiceOrb
 import com.aaya.assistant.ui.assistant.VoiceOverlaySheet
+import com.aaya.assistant.ui.festival.FestivalGreetingDialog
 import com.aaya.assistant.ui.memory.MemoryDashboardScreen
 import com.aaya.assistant.ui.notes.NotesAndScheduleScreen
 import com.aaya.assistant.ui.permissions.PermissionWizardScreen
 import com.aaya.assistant.ui.settings.ApiSettingsScreen
+import com.aaya.assistant.ui.settings.VoiceCustomizerDialog
 import com.aaya.assistant.ui.theme.*
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -115,6 +120,15 @@ class MainActivity : ComponentActivity() {
             // Safeguarded against Android 14 FGS restrictions
         }
 
+        // Schedule proactive hydration & rest guardian reminders
+        try {
+            if (prefs.isWaterReminderEnabled) {
+                HydrationReceiver.scheduleNext(this)
+            }
+        } catch (t: Throwable) {
+            // Ignore
+        }
+
         handleVoiceTriggerIntent(intent)
 
         setContent {
@@ -123,6 +137,7 @@ class MainActivity : ComponentActivity() {
                     assistantState = assistantState,
                     audioLevelRms = audioLevelRms,
                     showVoiceSheet = showVoiceSheet,
+                    ttsManager = ttsManager,
                     onToggleVoiceSession = { toggleVoiceListening() },
                     onStopSpeech = { ttsManager.stop() },
                     onSuggestionClicked = { suggestion ->
@@ -200,6 +215,7 @@ fun MainAppScaffold(
     assistantState: AssistantState,
     audioLevelRms: Float,
     showVoiceSheet: Boolean,
+    ttsManager: TextToSpeechManager,
     onToggleVoiceSession: () -> Unit,
     onStopSpeech: () -> Unit,
     onSuggestionClicked: (String) -> Unit,
@@ -209,13 +225,31 @@ fun MainAppScaffold(
     val app = AayaApplication.instance
     val scope = rememberCoroutineScope()
 
+    var showVoiceCustomizer by remember { mutableStateOf(false) }
+    var selectedFestivalForDialog by remember { mutableStateOf<com.aaya.assistant.data.model.FestivalModel?>(null) }
+
     val memories by app.database.aayaDao().getAllMemory().collectAsState(initial = emptyList())
     val routines by app.database.aayaDao().getAllRoutines().collectAsState(initial = emptyList())
     val vips by app.database.aayaDao().getAllVipContacts().collectAsState(initial = emptyList())
     val notes by app.database.aayaDao().getAllNotes().collectAsState(initial = emptyList())
     val shoppingList by app.database.aayaDao().getNotesByCategory("Shopping").collectAsState(initial = emptyList())
+    val expenses by app.database.aayaDao().getAllExpenses().collectAsState(initial = emptyList())
     val scheduledTasks by app.database.aayaDao().getPendingScheduledTasks().collectAsState(initial = emptyList())
     val auditLogs by app.database.aayaDao().getRecentAuditLogs().collectAsState(initial = emptyList())
+
+    if (showVoiceCustomizer) {
+        VoiceCustomizerDialog(
+            ttsManager = ttsManager,
+            onDismiss = { showVoiceCustomizer = false }
+        )
+    }
+
+    selectedFestivalForDialog?.let { festival ->
+        FestivalGreetingDialog(
+            festival = festival,
+            onDismiss = { selectedFestivalForDialog = null }
+        )
+    }
 
     Scaffold(
         bottomBar = {
@@ -270,11 +304,15 @@ fun MainAppScaffold(
                     nextTask = scheduledTasks.firstOrNull(),
                     onOrbClick = onToggleVoiceSession,
                     onOpenFeature = { query -> onSuggestionClicked(query) },
-                    onNavigateToHub = { currentNavIndex = 1 }
+                    onNavigateToHub = { currentNavIndex = 1 },
+                    onOpenVoiceStudio = { showVoiceCustomizer = true },
+                    onOpenFestivalCard = { fest -> selectedFestivalForDialog = fest },
+                    onSpeakQuote = { quoteText -> ttsManager.speak(quoteText) }
                 )
                 1 -> NotesAndScheduleScreen(
                     notes = notes,
                     shoppingList = shoppingList,
+                    expenses = expenses,
                     scheduledTasks = scheduledTasks,
                     auditLogs = auditLogs,
                     onToggleShoppingItem = { item ->
@@ -283,11 +321,19 @@ fun MainAppScaffold(
                         }
                     },
                     onDeleteNote = { item -> scope.launch { app.database.aayaDao().deleteNote(item) } },
+                    onDeleteExpense = { exp -> scope.launch { app.database.aayaDao().deleteExpense(exp) } },
                     onDeleteScheduledTask = { task -> scope.launch { app.database.aayaDao().deleteScheduledTask(task) } },
                     onAddNote = { title, content, cat ->
                         scope.launch {
                             app.database.aayaDao().insertNote(
                                 NoteItem(title = title, content = content, category = cat)
+                            )
+                        }
+                    },
+                    onAddExpense = { amount, cat, desc ->
+                        scope.launch {
+                            app.database.aayaDao().insertExpense(
+                                ExpenseItem(amount = amount, category = cat, description = desc)
                             )
                         }
                     }
@@ -341,15 +387,23 @@ fun HomeScreen(
     nextTask: ScheduledTask?,
     onOrbClick: () -> Unit,
     onOpenFeature: (String) -> Unit,
-    onNavigateToHub: () -> Unit
+    onNavigateToHub: () -> Unit,
+    onOpenVoiceStudio: () -> Unit,
+    onOpenFestivalCard: (com.aaya.assistant.data.model.FestivalModel) -> Unit,
+    onSpeakQuote: (String) -> Unit
 ) {
+    val prefs = AayaApplication.instance.preferenceManager
+    val userName = prefs.userName.ifBlank { "Friend" }
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greeting = when {
-        hour in 5..11 -> "Good morning 👋"
-        hour in 12..16 -> "Good afternoon ☀️"
-        hour in 17..21 -> "Good evening 🌆"
-        else -> "Good night 🌙"
+        hour in 5..11 -> "Good morning, $userName! ☀️"
+        hour in 12..16 -> "Good afternoon, $userName! 🌤️"
+        hour in 17..21 -> "Good evening, $userName! 🌅"
+        else -> "Good night, $userName! 🌙"
     }
+
+    val dailyQuote = remember { QuoteLibrary.getQuoteOfTheDay() }
+    val upcomingFestival = remember { FestivalManager.getUpcomingFestival() }
 
     LazyColumn(
         modifier = Modifier
@@ -360,21 +414,159 @@ fun HomeScreen(
     ) {
         // App Header & Personal Greeting
         item {
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.Start
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = greeting,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = TextPrimary
-                )
-                Text(
-                    text = "AAYA Voice & Lifestyle Assistant",
-                    fontSize = 13.sp,
-                    color = NeonCyan
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = greeting,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "AAYA Companion & Lifestyle AI",
+                        fontSize = 12.sp,
+                        color = NeonCyan
+                    )
+                }
+                // Voice Studio Quick Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(RadiantPurple.copy(alpha = 0.25f))
+                        .border(1.dp, RadiantPurple.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .clickable { onOpenVoiceStudio() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.GraphicEq, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = prefs.voicePreset.lowercase().replaceFirstChar { it.uppercase() },
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    }
+                }
+            }
+        }
+
+        // Upcoming Indian Festival Banner
+        if (upcomingFestival != null) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = GlassSurface),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.5.dp,
+                            brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(GoldAccent, NeonCyan, RadiantPurple)
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .clickable { onOpenFestivalCard(upcomingFestival) }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(GoldAccent.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Celebration, contentDescription = null, tint = GoldAccent)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "FESTIVAL CELEBRATION",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GoldAccent,
+                                letterSpacing = 1.sp
+                            )
+                            Text(upcomingFestival.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(upcomingFestival.wishesHindi.take(45) + "…", fontSize = 11.sp, color = TextSecondary, maxLines = 1)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Card ➔",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonCyan
+                        )
+                    }
+                }
+            }
+        }
+
+        // Bilingual Daily Inspiration Quote Card
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = GlassSurface),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.FormatQuote, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "आज का सुविचार • Daily Inspiration",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NeonCyan
+                            )
+                        }
+                        IconButton(
+                            onClick = { onSpeakQuote("${dailyQuote.hindiText} — ${dailyQuote.author}") },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.VolumeUp, contentDescription = "Listen", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "“${dailyQuote.hindiText}”",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextPrimary,
+                        lineHeight = 18.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "“${dailyQuote.englishText}”",
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        lineHeight = 15.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "— ${dailyQuote.author}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GoldAccent,
+                        modifier = Modifier.align(Alignment.End)
+                    )
+                }
             }
         }
 
@@ -487,18 +679,18 @@ fun HomeScreen(
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     QuickActionCard(
+                        title = "Hisab-Kitab",
+                        subtitle = "Log Expense ₹",
+                        icon = Icons.Default.AccountBalanceWallet,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onOpenFeature("Kitna kharch hua aaj?") }
+                    )
+                    QuickActionCard(
                         title = "Take Photo",
                         subtitle = "Camera Assistant",
                         icon = Icons.Default.CameraAlt,
                         modifier = Modifier.weight(1f),
                         onClick = { onOpenFeature("Take a photo") }
-                    )
-                    QuickActionCard(
-                        title = "Shopping",
-                        subtitle = "Check List",
-                        icon = Icons.Default.ShoppingCart,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onOpenFeature("What is on my shopping list?") }
                     )
                 }
 
@@ -511,28 +703,28 @@ fun HomeScreen(
                         onClick = { onOpenFeature("Turn on flashlight") }
                     )
                     QuickActionCard(
-                        title = "Study Session",
-                        subtitle = "45m Focus + DND",
-                        icon = Icons.Default.MenuBook,
+                        title = "Emergency SOS",
+                        subtitle = "Strobe Beacon",
+                        icon = Icons.Default.Warning,
                         modifier = Modifier.weight(1f),
-                        onClick = { onOpenFeature("Start a 45-minute study session") }
+                        onClick = { onOpenFeature("SOS") }
                     )
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    QuickActionCard(
+                        title = "Shopping",
+                        subtitle = "Check List",
+                        icon = Icons.Default.ShoppingCart,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onOpenFeature("What is on my shopping list?") }
+                    )
                     QuickActionCard(
                         title = "Daily Plan",
                         subtitle = "Classes & Alarms",
                         icon = Icons.Default.CalendarToday,
                         modifier = Modifier.weight(1f),
                         onClick = { onOpenFeature("Plan my day") }
-                    )
-                    QuickActionCard(
-                        title = "Audit Log",
-                        subtitle = "What did you do?",
-                        icon = Icons.Default.Security,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onOpenFeature("What did you do today?") }
                     )
                 }
             }

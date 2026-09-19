@@ -3,6 +3,7 @@ package com.aaya.assistant.engine.audio
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import com.aaya.assistant.data.local.PreferenceManager
 import java.util.Locale
 
 interface TtsCallback {
@@ -12,10 +13,11 @@ interface TtsCallback {
 }
 
 class TextToSpeechManager(
-    context: Context,
+    private val context: Context,
     private val callback: TtsCallback? = null
 ) : TextToSpeech.OnInitListener {
 
+    private val prefs = PreferenceManager(context)
     private var tts: TextToSpeech? = TextToSpeech(context.applicationContext, this)
     private var isInitialized: Boolean = false
 
@@ -26,8 +28,8 @@ class TextToSpeechManager(
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     engine.setLanguage(Locale.US)
                 }
-                engine.setPitch(1.05f) // Crisp, modern, energetic tone
-                engine.setSpeechRate(1.02f) // Fluid, natural pacing
+
+                applySavedVoiceSettings()
 
                 engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
@@ -49,6 +51,37 @@ class TextToSpeechManager(
         }
     }
 
+    fun applySavedVoiceSettings() {
+        val preset = prefs.voicePreset
+        val (pitch, speed) = when (preset.uppercase()) {
+            "FEMALE" -> Pair(1.15f, 1.05f)
+            "MALE" -> Pair(0.85f, 0.98f)
+            "CHILD" -> Pair(1.40f, 1.10f)
+            "OLD_MAN" -> Pair(0.75f, 0.85f)
+            "ROBOT" -> Pair(0.55f, 1.15f)
+            "CUSTOM" -> Pair(prefs.voicePitch, prefs.voiceSpeed)
+            else -> Pair(1.10f, 1.02f)
+        }
+        setPitchAndSpeed(pitch, speed)
+    }
+
+    fun setVoicePreset(preset: String) {
+        prefs.voicePreset = preset
+        applySavedVoiceSettings()
+    }
+
+    fun setCustomPitchAndSpeed(pitch: Float, speed: Float) {
+        prefs.voicePreset = "CUSTOM"
+        prefs.voicePitch = pitch
+        prefs.voiceSpeed = speed
+        setPitchAndSpeed(pitch, speed)
+    }
+
+    private fun setPitchAndSpeed(pitch: Float, speed: Float) {
+        tts?.setPitch(pitch)
+        tts?.setSpeechRate(speed)
+    }
+
     /**
      * Speaks the given text. Immediately cuts off prior speech (barge-in handling).
      */
@@ -64,12 +97,12 @@ class TextToSpeechManager(
     fun stop() {
         if (tts?.isSpeaking == true) {
             tts?.stop()
-            callback?.onSpeechFinished()
         }
+        callback?.onSpeechFinished()
     }
 
     fun shutdown() {
-        tts?.stop()
+        stop()
         tts?.shutdown()
         tts = null
         isInitialized = false

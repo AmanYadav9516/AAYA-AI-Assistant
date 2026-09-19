@@ -123,4 +123,17 @@ interface AayaDao {
 
     @Query("SELECT * FROM aaya_audit_log ORDER BY timestamp DESC LIMIT 20")
     fun getRecentAuditLogs(): Flow<List<com.aaya.assistant.data.model.AuditLogItem>>
+
+    // Expense Tracker operations
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertExpense(expense: com.aaya.assistant.data.model.ExpenseItem): Long
+
+    @Query("SELECT * FROM aaya_expenses ORDER BY timestamp DESC")
+    fun getAllExpenses(): Flow<List<com.aaya.assistant.data.model.ExpenseItem>>
+
+    @Query("SELECT * FROM aaya_expenses WHERE timestamp >= :sinceEpochMs ORDER BY timestamp DESC")
+    suspend fun getExpensesSince(sinceEpochMs: Long): List<com.aaya.assistant.data.model.ExpenseItem>
+
+    @Delete
+    suspend fun deleteExpense(expense: com.aaya.assistant.data.model.ExpenseItem)
 }

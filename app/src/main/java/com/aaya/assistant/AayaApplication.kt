@@ -64,6 +64,35 @@ class AayaApplication : Application() {
         }
     }
 
+    fun showSystemNotification(title: String, message: String) {
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val openAppIntent = android.content.Intent(this, com.aaya.assistant.ui.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pendingIntent = android.app.PendingIntent.getActivity(
+                this,
+                System.currentTimeMillis().toInt(),
+                openAppIntent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notif = androidx.core.app.NotificationCompat.Builder(this, CHANNEL_LIFESTYLE_ALERTS)
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(message))
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                .build()
+
+            notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), notif)
+        } catch (e: Exception) {
+            // Ignore notification failure
+        }
+    }
+
     companion object {
         const val CHANNEL_ASSISTANT_SERVICE = "aaya_service_channel"
         const val CHANNEL_LIFESTYLE_ALERTS = "aaya_lifestyle_alerts"

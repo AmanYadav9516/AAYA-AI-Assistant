@@ -123,117 +123,221 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
         userQuery: String,
         systemContext: String = ""
     ): GeminiResult = withContext(Dispatchers.IO) {
+        val aiProvider = preferenceManager.aiProvider.uppercase()
+
+        // If user explicitly chose OpenRouter, execute via OpenRouter
+        if (aiProvider == "OPENROUTER") {
+            val openRouterResult = executeOpenRouterPrompt(userQuery, systemContext)
+            if (openRouterResult is GeminiResult.Success) {
+                return@withContext openRouterResult
+            }
+            // If OpenRouter failed and Gemini key exists, fall through to Gemini
+        }
+
         val apiKey = preferenceManager.apiKey.ifEmpty { DEFAULT_FALLBACK_KEY }
         if (apiKey.isBlank()) {
+            if (preferenceManager.openRouterApiKey.isNotBlank()) {
+                return@withContext executeOpenRouterPrompt(userQuery, systemContext)
+            }
             return@withContext GeminiResult.Error("API Key missing. Please set it in Settings.")
         }
 
         val startTime = System.currentTimeMillis()
 
-        try {
-            // Build multi-turn contents
-            val contentsArray = JSONArray()
-            for (prevTurn in conversationHistory) {
-                contentsArray.put(prevTurn)
-            }
-            val currentTurn = JSONObject().apply {
-                put("role", "user")
-                put("parts", JSONArray().apply {
-                    put(JSONObject().put("text", userQuery))
-                })
-            }
-            contentsArray.put(currentTurn)
+        // Build multi-turn contents
+        val contentsArray = JSONArray()
+        for (prevTurn in conversationHistory) {
+            contentsArray.put(prevTurn)
+        }
+        val currentTurn = JSONObject().apply {
+            put("role", "user")
+            put("parts", JSONArray().apply {
+                put(JSONObject().put("text", userQuery))
+            })
+        }
+        contentsArray.put(currentTurn)
 
-            val rootJson = JSONObject().apply {
-                // System Instruction
-                put("systemInstruction", JSONObject().apply {
-                    put("parts", JSONArray().apply {
-                        put(JSONObject().put("text", buildSystemPrompt(systemContext)))
+        val rootJson = JSONObject().apply {
+            // System Instruction
+            put("systemInstruction", JSONObject().apply {
+                put("parts", JSONArray().apply {
+                    put(JSONObject().put("text", buildSystemPrompt(systemContext)))
+                })
+            })
+
+            put("contents", contentsArray)
+
+            // Tool Declarations
+            put("tools", buildToolDeclarations())
+        }
+
+        // Auto-retry with exponential backoff on 503 or transient errors
+        var attempts = 0
+        val maxAttempts = 3
+        var backoffMs = 800L
+        var lastError: GeminiResult.Error? = null
+
+        while (attempts < maxAttempts) {
+            attempts++
+            try {
+                val request = buildRequest(apiKey, rootJson)
+                client.newCall(request).execute().use { response ->
+                    val latency = System.currentTimeMillis() - startTime
+                    val responseString = response.body?.string() ?: ""
+
+                    preferenceManager.totalApiRequests += 1
+
+                    if (response.code == 503 || response.code == 429) {
+                        lastError = GeminiResult.Error("Service temporarily busy (${response.code}). Retrying...", response.code)
+                        if (attempts < maxAttempts) {
+                            kotlinx.coroutines.delay(backoffMs)
+                            backoffMs *= 2
+                            return@use
+                        }
+                    }
+
+                    if (!response.isSuccessful) {
+                        val errorDetail = "API Error ${response.code}: $responseString"
+                        preferenceManager.lastApiError = errorDetail
+                        lastError = GeminiResult.Error(errorDetail, response.code)
+                        return@use
+                    }
+
+                    preferenceManager.successfulApiRequests += 1
+                    preferenceManager.lastApiLatencyMs = latency
+                    preferenceManager.lastApiError = null
+
+                    // Parse Candidates & Function Calls
+                    val responseJson = JSONObject(responseString)
+                    val candidates = responseJson.optJSONArray("candidates")
+                    if (candidates == null || candidates.length() == 0) {
+                        return@withContext GeminiResult.Success("I didn't catch that clearly. Could you repeat?", emptyList(), latency)
+                    }
+
+                    val firstCandidate = candidates.getJSONObject(0)
+                    val content = firstCandidate.optJSONObject("content")
+                    val parts = content?.optJSONArray("parts") ?: JSONArray()
+
+                    val functionCalls = mutableListOf<FunctionCallRequest>()
+                    val textBuilder = StringBuilder()
+
+                    for (i in 0 until parts.length()) {
+                        val part = parts.getJSONObject(i)
+                        if (part.has("text")) {
+                            textBuilder.append(part.getString("text"))
+                        } else if (part.has("functionCall")) {
+                            val fnObj = part.getJSONObject("functionCall")
+                            val name = fnObj.getString("name")
+                            val argsObj = fnObj.optJSONObject("args") ?: JSONObject()
+                            val argsMap = mutableMapOf<String, Any?>()
+                            val keys = argsObj.keys()
+                            while (keys.hasNext()) {
+                                val k = keys.next()
+                                argsMap[k] = argsObj.get(k)
+                            }
+                            functionCalls.add(FunctionCallRequest(name, argsMap))
+                        }
+                    }
+
+                    val finalResponseText = textBuilder.toString().trim()
+
+                    // If it was a device action/function call, avoid polluting history to prevent repeat commands
+                    if (functionCalls.isEmpty()) {
+                        conversationHistory.add(currentTurn)
+                        if (finalResponseText.isNotEmpty()) {
+                            conversationHistory.add(JSONObject().apply {
+                                put("role", "model")
+                                put("parts", JSONArray().apply {
+                                    put(JSONObject().put("text", finalResponseText))
+                                })
+                            })
+                        }
+                        while (conversationHistory.size > 8) {
+                            conversationHistory.removeAt(0)
+                        }
+                    } else {
+                        // Keep history clean after direct actions
+                        conversationHistory.clear()
+                    }
+
+                    return@withContext GeminiResult.Success(
+                        responseText = finalResponseText,
+                        functionCalls = functionCalls,
+                        latencyMs = latency
+                    )
+                }
+            } catch (e: Exception) {
+                lastError = GeminiResult.Error(e.localizedMessage ?: "Network connection failed")
+                if (attempts < maxAttempts) {
+                    kotlinx.coroutines.delay(backoffMs)
+                    backoffMs *= 2
+                }
+            }
+        }
+
+        // Fallback to OpenRouter if configured or if Gemini 503 persisted
+        if (preferenceManager.openRouterApiKey.isNotBlank()) {
+            val fallbackResult = executeOpenRouterPrompt(userQuery, systemContext)
+            if (fallbackResult is GeminiResult.Success) {
+                return@withContext fallbackResult
+            }
+        }
+
+        preferenceManager.lastApiError = lastError?.errorMessage
+        return@withContext lastError ?: GeminiResult.Error("Gemini servers are experiencing high demand. Please retry in a moment.")
+    }
+
+    private suspend fun executeOpenRouterPrompt(
+        userQuery: String,
+        systemContext: String
+    ): GeminiResult = withContext(Dispatchers.IO) {
+        val key = preferenceManager.openRouterApiKey.ifEmpty { preferenceManager.apiKey }
+        if (key.isBlank()) {
+            return@withContext GeminiResult.Error("OpenRouter API key is not configured.")
+        }
+
+        val startTime = System.currentTimeMillis()
+        try {
+            val payload = JSONObject().apply {
+                put("model", "google/gemini-2.0-flash-exp:free")
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", buildSystemPrompt(systemContext))
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", userQuery)
                     })
                 })
-
-                put("contents", contentsArray)
-
-                // Tool Declarations
-                put("tools", buildToolDeclarations())
             }
 
-            val request = buildRequest(apiKey, rootJson)
+            val request = Request.Builder()
+                .url("https://openrouter.ai/api/v1/chat/completions")
+                .addHeader("Authorization", "Bearer $key")
+                .addHeader("HTTP-Referer", "https://github.com/AmanYadav9516/AAYA-AI-Assistant")
+                .addHeader("X-Title", "AAYA AI Assistant")
+                .post(payload.toString().toRequestBody(jsonMediaType))
+                .build()
+
             client.newCall(request).execute().use { response ->
                 val latency = System.currentTimeMillis() - startTime
-                val responseString = response.body?.string() ?: ""
-
-                preferenceManager.totalApiRequests += 1
-
+                val body = response.body?.string() ?: ""
                 if (!response.isSuccessful) {
-                    val errorDetail = "API Error ${response.code}: $responseString"
-                    preferenceManager.lastApiError = errorDetail
-                    return@withContext GeminiResult.Error(errorDetail, response.code)
+                    return@withContext GeminiResult.Error("OpenRouter error ${response.code}: $body", response.code)
                 }
 
-                preferenceManager.successfulApiRequests += 1
-                preferenceManager.lastApiLatencyMs = latency
-                preferenceManager.lastApiError = null
-
-                // Parse Candidates & Function Calls
-                val responseJson = JSONObject(responseString)
-                val candidates = responseJson.optJSONArray("candidates")
-                if (candidates == null || candidates.length() == 0) {
-                    return@withContext GeminiResult.Success("I didn't catch that clearly. Could you repeat?", emptyList(), latency)
+                val json = JSONObject(body)
+                val choices = json.optJSONArray("choices")
+                if (choices != null && choices.length() > 0) {
+                    val msg = choices.getJSONObject(0).optJSONObject("message")
+                    val reply = msg?.optString("content", "") ?: ""
+                    return@withContext GeminiResult.Success(reply.trim(), emptyList(), latency)
                 }
-
-                val firstCandidate = candidates.getJSONObject(0)
-                val content = firstCandidate.optJSONObject("content")
-                val parts = content?.optJSONArray("parts") ?: JSONArray()
-
-                val functionCalls = mutableListOf<FunctionCallRequest>()
-                val textBuilder = StringBuilder()
-
-                for (i in 0 until parts.length()) {
-                    val part = parts.getJSONObject(i)
-                    if (part.has("text")) {
-                        textBuilder.append(part.getString("text"))
-                    } else if (part.has("functionCall")) {
-                        val fnObj = part.getJSONObject("functionCall")
-                        val name = fnObj.getString("name")
-                        val argsObj = fnObj.optJSONObject("args") ?: JSONObject()
-                        val argsMap = mutableMapOf<String, Any?>()
-                        val keys = argsObj.keys()
-                        while (keys.hasNext()) {
-                            val k = keys.next()
-                            argsMap[k] = argsObj.get(k)
-                        }
-                        functionCalls.add(FunctionCallRequest(name, argsMap))
-                    }
-                }
-
-                val finalResponseText = textBuilder.toString().trim()
-
-                // Save turn to multi-turn conversation history
-                conversationHistory.add(currentTurn)
-                if (finalResponseText.isNotEmpty()) {
-                    conversationHistory.add(JSONObject().apply {
-                        put("role", "model")
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().put("text", finalResponseText))
-                        })
-                    })
-                }
-                while (conversationHistory.size > 8) {
-                    conversationHistory.removeAt(0)
-                }
-
-                GeminiResult.Success(
-                    responseText = finalResponseText,
-                    functionCalls = functionCalls,
-                    latencyMs = latency
-                )
+                return@withContext GeminiResult.Error("Empty response from OpenRouter")
             }
         } catch (e: Exception) {
-            val errorMsg = e.localizedMessage ?: "Network connection failed"
-            preferenceManager.totalApiRequests += 1
-            preferenceManager.lastApiError = errorMsg
-            GeminiResult.Error(errorMsg)
+            return@withContext GeminiResult.Error("OpenRouter request failed: ${e.localizedMessage}")
         }
     }
 
@@ -256,7 +360,7 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
             You are AAYA, an elite voice and lifestyle AI assistant for Android.
             Your answers are concise, friendly, and optimized for voice speech (TTS).
             Keep spoken voice answers under 1-2 sentences. Never reply with verbose paragraphs.
-            Understand multilingual phrases in English, Hindi, and Hinglish (e.g., 'Mummy ko call karo', 'Papa ko phone lagao', 'Silent mode on karo', 'Ye note save karo').
+            Understand multilingual phrases in English, Hindi, and Hinglish (e.g., 'Mummy ko call karo', 'Papa ko phone lagao', 'Silent mode on karo', 'Ye note save karo', '50 rupay chai me kharch huye').
             When a user requests one or multiple device actions (e.g. 'Set alarm for 7, turn on torch, and activate sleep mode'), invoke all relevant function calls simultaneously.
             
             Current User Lifestyle & Memory Context:
@@ -456,6 +560,96 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
                             put("type", "object")
                             put("properties", JSONObject().apply {
                                 put("day", JSONObject().put("type", "string").put("description", "'today' or 'tomorrow'"))
+                            })
+                        })
+                    })
+
+                    // Expense Tracker: Record Expense
+                    put(JSONObject().apply {
+                        put("name", "record_expense")
+                        put("description", "Record a pocket money or daily expense (Hisab-Kitab)")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("amount", JSONObject().put("type", "number").put("description", "Amount spent in Rupees or local currency (e.g. 50, 120.50)"))
+                                put("category", JSONObject().put("type", "string").put("description", "Category: Food, Travel, College, Shopping, Bills, Entertainment, Other"))
+                                put("description", JSONObject().put("type", "string").put("description", "Short description (e.g. Chai, Auto rickshaw, Books)"))
+                            })
+                            put("required", JSONArray().put("amount"))
+                        })
+                    })
+
+                    // Expense Tracker: Query Expenses
+                    put(JSONObject().apply {
+                        put("name", "query_expenses")
+                        put("description", "Query total expenses spent today, this week, or this month")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("time_frame", JSONObject().put("type", "string").put("description", "'today', 'this_week', 'this_month', 'all'"))
+                            })
+                        })
+                    })
+
+                    // WhatsApp Message
+                    put(JSONObject().apply {
+                        put("name", "send_whatsapp_message")
+                        put("description", "Compose or send a message via WhatsApp to a person or group")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("contact_name", JSONObject().put("type", "string").put("description", "Contact or group name (e.g. Mummy, Bro, Friends Group)"))
+                                put("message_text", JSONObject().put("type", "string").put("description", "Message text content"))
+                            })
+                            put("required", JSONArray().put("message_text"))
+                        })
+                    })
+
+                    // Emergency SOS Beacon
+                    put(JSONObject().apply {
+                        put("name", "emergency_sos")
+                        put("description", "Activate emergency SOS beacon with flashing strobe light and loud alert")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("action", JSONObject().put("type", "string").put("description", "'strobe_on', 'strobe_off'"))
+                            })
+                        })
+                    })
+
+                    // Voice Style Switcher
+                    put(JSONObject().apply {
+                        put("name", "change_voice_style")
+                        put("description", "Change the assistant's voice style preset")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("preset", JSONObject().put("type", "string").put("description", "'FEMALE', 'MALE', 'CHILD', 'OLD_MAN', 'ROBOT'"))
+                            })
+                            put("required", JSONArray().put("preset"))
+                        })
+                    })
+
+                    // Daily Inspiration Quote
+                    put(JSONObject().apply {
+                        put("name", "get_daily_quote")
+                        put("description", "Get an inspiring motivational quote in Hindi and English with author")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("category", JSONObject().put("type", "string").put("description", "'morning', 'motivation', 'success'"))
+                            })
+                        })
+                    })
+
+                    // Festival Greeting Card
+                    put(JSONObject().apply {
+                        put("name", "festival_greeting")
+                        put("description", "Show or share upcoming Indian festival greeting card with heart-touching wishes")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("festival_name", JSONObject().put("type", "string").put("description", "Optional festival name (e.g. Diwali, Holi, Raksha Bandhan)"))
                             })
                         })
                     })

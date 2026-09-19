@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aaya.assistant.data.model.AuditLogItem
+import com.aaya.assistant.data.model.ExpenseItem
 import com.aaya.assistant.data.model.NoteItem
 import com.aaya.assistant.data.model.ScheduledTask
 import com.aaya.assistant.ui.theme.*
@@ -30,20 +31,28 @@ import java.util.*
 fun NotesAndScheduleScreen(
     notes: List<NoteItem>,
     shoppingList: List<NoteItem>,
+    expenses: List<ExpenseItem> = emptyList(),
     scheduledTasks: List<ScheduledTask>,
     auditLogs: List<AuditLogItem>,
     onToggleShoppingItem: (NoteItem) -> Unit,
     onDeleteNote: (NoteItem) -> Unit,
+    onDeleteExpense: (ExpenseItem) -> Unit = {},
     onDeleteScheduledTask: (ScheduledTask) -> Unit,
-    onAddNote: (String, String, String) -> Unit
+    onAddNote: (String, String, String) -> Unit,
+    onAddExpense: (Double, String, String) -> Unit = { _, _, _ -> }
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Notes", "Shopping", "Scheduled", "Audit Log")
+    val tabs = listOf("Notes", "Shopping", "Expenses", "Scheduled", "Audit Log")
 
     var showAddNoteDialog by remember { mutableStateOf(false) }
     var newNoteTitle by remember { mutableStateOf("") }
     var newNoteContent by remember { mutableStateOf("") }
     var newNoteCategory by remember { mutableStateOf("Notes") }
+
+    var showAddExpenseDialog by remember { mutableStateOf(false) }
+    var expenseAmount by remember { mutableStateOf("") }
+    var expenseDesc by remember { mutableStateOf("") }
+    var expenseCategory by remember { mutableStateOf("Food") }
 
     Column(
         modifier = Modifier
@@ -64,16 +73,20 @@ fun NotesAndScheduleScreen(
                     color = NeonCyan
                 )
                 Text(
-                    text = "Smart Notes, Lists & Scheduled Actions",
+                    text = "Smart Notes, Hisab-Kitab & Scheduled Actions",
                     fontSize = 12.sp,
                     color = TextSecondary
                 )
             }
-            if (selectedTab == 0 || selectedTab == 1) {
+            if (selectedTab == 0 || selectedTab == 1 || selectedTab == 2) {
                 IconButton(
                     onClick = {
-                        newNoteCategory = if (selectedTab == 1) "Shopping" else "Notes"
-                        showAddNoteDialog = true
+                        if (selectedTab == 2) {
+                            showAddExpenseDialog = true
+                        } else {
+                            newNoteCategory = if (selectedTab == 1) "Shopping" else "Notes"
+                            showAddNoteDialog = true
+                        }
                     },
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
@@ -100,7 +113,7 @@ fun NotesAndScheduleScreen(
                     text = {
                         Text(
                             text = title,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
                             color = if (selectedTab == index) NeonCyan else TextSecondary
                         )
@@ -114,8 +127,9 @@ fun NotesAndScheduleScreen(
         when (selectedTab) {
             0 -> NotesTabContent(notes.filter { it.category != "Shopping" }, onDeleteNote)
             1 -> ShoppingTabContent(shoppingList, onToggleShoppingItem, onDeleteNote)
-            2 -> ScheduledTabContent(scheduledTasks, onDeleteScheduledTask)
-            3 -> AuditLogTabContent(auditLogs)
+            2 -> ExpensesTabContent(expenses, onDeleteExpense)
+            3 -> ScheduledTabContent(scheduledTasks, onDeleteScheduledTask)
+            4 -> AuditLogTabContent(auditLogs)
         }
     }
 
@@ -170,6 +184,174 @@ fun NotesAndScheduleScreen(
                 }
             }
         )
+    }
+
+    if (showAddExpenseDialog) {
+        val categories = listOf("Food", "Travel", "College", "Shopping", "Bills", "Entertainment", "Other")
+        AlertDialog(
+            onDismissRequest = { showAddExpenseDialog = false },
+            containerColor = SurfaceDark,
+            title = { Text("Log Pocket Expense (Hisab)", color = TextPrimary) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = expenseAmount,
+                        onValueChange = { expenseAmount = it },
+                        label = { Text("Amount (₹)") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = NeonCyan
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = expenseDesc,
+                        onValueChange = { expenseDesc = it },
+                        label = { Text("Description (e.g. Chai, Auto)") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = NeonCyan
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        categories.take(4).forEach { cat ->
+                            AssistChip(
+                                onClick = { expenseCategory = cat },
+                                label = { Text(cat, fontSize = 10.sp) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = if (expenseCategory == cat) NeonCyan.copy(alpha = 0.25f) else GlassSurface,
+                                    labelColor = if (expenseCategory == cat) NeonCyan else TextSecondary
+                                )
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val amount = expenseAmount.toDoubleOrNull() ?: 0.0
+                    if (amount > 0) {
+                        val desc = expenseDesc.ifBlank { "$expenseCategory Expense" }
+                        onAddExpense(amount, expenseCategory, desc)
+                        expenseAmount = ""
+                        expenseDesc = ""
+                        showAddExpenseDialog = false
+                    }
+                }) {
+                    Text("Record", color = NeonCyan)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddExpenseDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun ExpensesTabContent(expenses: List<ExpenseItem>, onDeleteExpense: (ExpenseItem) -> Unit) {
+    if (expenses.isEmpty()) {
+        EmptyState(
+            icon = Icons.Default.AccountBalanceWallet,
+            message = "No expenses recorded yet.\nSay '50 rupay chai me kharch huye' or 'I spent 120 on auto' to log by voice!"
+        )
+    } else {
+        val total = expenses.sumOf { it.amount }
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val todayTotal = expenses.filter { it.timestamp >= today }.sumOf { it.amount }
+
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Summary Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = GlassSurface),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, NeonCyan.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("TODAY'S SPEND", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonCyan)
+                            Text("₹${String.format(Locale.US, "%.0f", todayTotal)}", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("ALL-TIME SPEND", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GoldAccent)
+                            Text("₹${String.format(Locale.US, "%.0f", total)}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = GoldAccent)
+                            Text("${expenses.size} items recorded", fontSize = 11.sp, color = TextSecondary)
+                        }
+                    }
+                }
+            }
+
+            items(expenses) { expense ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = expense.category,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NeonCyan,
+                                    modifier = Modifier
+                                        .background(NeonCyan.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(expense.timestamp)),
+                                    fontSize = 10.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(expense.description, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "₹${String.format(Locale.US, "%.0f", expense.amount)}",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GoldAccent
+                            )
+                            IconButton(onClick = { onDeleteExpense(expense) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.7f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
