@@ -279,6 +279,16 @@ class DeviceController(private val context: Context) {
         }
     }
 
+    fun scheduleExactTask(
+        triggerEpochMs: Long,
+        title: String,
+        taskType: String,
+        targetData: String = "",
+        taskId: Long = System.currentTimeMillis()
+    ): Boolean {
+        return scheduleTaskNotification(triggerEpochMs, taskId, title, taskType, targetData)
+    }
+
     fun scheduleTaskNotification(
         triggerEpochMs: Long,
         taskId: Long,

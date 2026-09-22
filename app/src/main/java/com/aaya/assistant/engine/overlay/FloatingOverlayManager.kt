@@ -77,38 +77,35 @@ class FloatingOverlayManager(private val context: Context) {
                 }
 
                 // Glowing Dot / Indicator
+                val dotParams = LinearLayout.LayoutParams(24, 24).apply {
+                    marginEnd = 24
+                }
                 val dotView = View(context).apply {
-                    val dotParams = LinearLayout.LayoutParams(24, 24).apply {
-                        marginEnd = 24
-                    }
-                    layoutParams = dotParams
                     background = GradientDrawable().apply {
                         shape = GradientDrawable.OVAL
                         setColor(Color.parseColor("#00E5FF"))
                     }
                 }
-                container.addView(dotView)
+                container.addView(dotView, dotParams)
 
                 // Assistant Text
+                val textParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
                 statusTextView = TextView(context).apply {
-                    val textParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
-                    layoutParams = textParams
                     text = initialText
                     setTextColor(Color.WHITE)
                     textSize = 14f
                     maxLines = 3
                 }
-                container.addView(statusTextView)
+                container.addView(statusTextView, textParams)
 
                 // Close Button
+                val closeParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    marginStart = 16
+                }
                 val closeButton = TextView(context).apply {
-                    val closeParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        marginStart = 16
-                    }
-                    layoutParams = closeParams
                     text = "✕"
                     setTextColor(Color.parseColor("#80FFFFFF"))
                     textSize = 16f
@@ -117,7 +114,7 @@ class FloatingOverlayManager(private val context: Context) {
                         hide()
                     }
                 }
-                container.addView(closeButton)
+                container.addView(closeButton, closeParams)
 
                 container.setOnClickListener {
                     onOverlayTapped?.invoke()

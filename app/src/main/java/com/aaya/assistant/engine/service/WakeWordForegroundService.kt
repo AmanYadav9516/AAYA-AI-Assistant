@@ -249,7 +249,8 @@ class WakeWordForegroundService : Service() {
                         override fun onBufferReceived(buffer: ByteArray?) {}
                         override fun onEndOfSpeech() {}
                         override fun onError(error: Int) {
-                            floatingOverlay.updateText("Sorry $userName, I didn't hear anything. Let me know if you need help! 🥺")
+                            val name = preferenceManager.userName.ifBlank { "there" }
+                            floatingOverlay.updateText("Sorry $name, I didn't hear anything. Let me know if you need help! 🥺")
                             abandonAudioDucking()
                             isProcessingCommand = false
                             restartListeningWithDelay(2500)
@@ -295,7 +296,9 @@ class WakeWordForegroundService : Service() {
         serviceScope.launch {
             try {
                 val result = commandRouter.routeCommand(command)
-                floatingOverlay.updateText(result.actionSummary.ifEmpty { result.speechResponse })
+                val summary = result.actionSummary
+                val speech = result.speechResponse
+                floatingOverlay.updateText(if (!summary.isNullOrEmpty()) summary else speech)
             } catch (e: Exception) {
                 floatingOverlay.updateText("Error: ${e.localizedMessage}")
             } finally {
@@ -371,7 +374,7 @@ class WakeWordForegroundService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("AAYA Voice Companion Active")
             .setContentText("Say \"Hey AAYA\" anytime to speak with your assistant")
-            .setSmallIcon(R.drawable.ic_stat_name)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)

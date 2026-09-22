@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun ApiSettingsScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = AayaApplication.instance.preferenceManager
     val scope = rememberCoroutineScope()
     val geminiClient = remember { GeminiClient(prefs) }
