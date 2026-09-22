@@ -35,6 +35,22 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
+    <!-- System Alert Window (Floating Siri-style overlay) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- SMS Permissions (for background auto-SMS & low battery SOS) -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+
+    <!-- Call Log & Answer Phone Calls (for "Aakhiri call kiski thi", Mom 3-day reminder & voice answering) -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+
+    <!-- Location background (for office geofence) -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Usage Stats (for App Usage Police) -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+
     <!-- Network & Internet for Gemini AI -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -127,6 +143,44 @@
             android:name=".engine.wellness.HydrationReceiver"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Background Wake-Word Listening Service -->
+        <service
+            android:name=".engine.service.WakeWordForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- Call State Receiver for Caller Announcer & Voice Answer -->
+        <receiver
+            android:name=".engine.telephony.CallStateReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Geofence & Location Commander Receiver -->
+        <receiver
+            android:name=".engine.location.GeofenceReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Medicine Alert & Persistent Reminder Activity -->
+        <activity
+            android:name=".engine.wellness.MedicineAlertActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AayaAssistant"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true" />
+
+        <!-- Hands-Free Voice Camera Activity -->
+        <activity
+            android:name=".engine.camera.VoiceCameraActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AayaAssistant"
+            android:screenOrientation="portrait" />
     </application>
 
 </manifest>

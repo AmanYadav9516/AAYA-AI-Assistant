@@ -120,6 +120,15 @@ class MainActivity : ComponentActivity() {
             // Safeguarded against Android 14 FGS restrictions
         }
 
+        // Start background wake-word listening service if enabled
+        try {
+            if (prefs.isWakeWordEnabled) {
+                com.aaya.assistant.engine.service.WakeWordForegroundService.start(this)
+            }
+        } catch (t: Throwable) {
+            // Safeguarded
+        }
+
         // Schedule proactive hydration & rest guardian reminders
         try {
             if (prefs.isWaterReminderEnabled) {
@@ -220,9 +229,9 @@ fun MainAppScaffold(
     onStopSpeech: () -> Unit,
     onSuggestionClicked: (String) -> Unit,
     onDismissVoiceSheet: () -> Unit
-) {
-    var currentNavIndex by remember { mutableIntStateOf(0) }
     val app = AayaApplication.instance
+    val initialNav = if (!app.preferenceManager.isInitialSetupDone) 3 else 0
+    var currentNavIndex by remember { mutableIntStateOf(initialNav) }
     val scope = rememberCoroutineScope()
 
     var showVoiceCustomizer by remember { mutableStateOf(false) }
@@ -349,7 +358,10 @@ fun MainAppScaffold(
                     onAddVip = { name, phone, rel -> scope.launch { app.database.aayaDao().insertVipContact(VipContact(name = name, phoneNumber = phone, relationship = rel)) } }
                 )
                 3 -> PermissionWizardScreen(
-                    onAllGranted = { currentNavIndex = 0 }
+                    onAllGranted = {
+                        app.preferenceManager.isInitialSetupDone = true
+                        currentNavIndex = 0
+                    }
                 )
                 4 -> ApiSettingsScreen()
             }

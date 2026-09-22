@@ -390,7 +390,108 @@ class CommandRouter(
             return@withContext ExecutionResult(msg, "WhatsApp Dictation", handledLocally = true)
         }
 
-        // 18. COMPLEX / AI ROUTE: Forward to Gemini 3.6 Flash AI Brain with Multi-Action Tool Calling
+        // 18. FAST LOCAL ROUTE: Hands-Free Voice Camera (3s Timer)
+        if (lower.contains("photo") || lower.contains("selfie") || lower.contains("kheench") || lower.contains("camera")) {
+            com.aaya.assistant.engine.camera.VoiceCameraActivity.launch(context)
+            val msg = "Opening camera with a 3-second timer. Smile!"
+            speak(msg)
+            logAudit("CAMERA", "Hands-free voice camera launched")
+            return@withContext ExecutionResult(msg, "Voice Camera 3s", handledLocally = true)
+        }
+
+        // 19. FAST LOCAL ROUTE: Last Call Information ("Aakhiri call kiski thi?")
+        if (lower.contains("aakhiri call") || lower.contains("last call") || lower.contains("pichli call") || lower.contains("who called")) {
+            val callInfo = getLastCallSummary()
+            speak(callInfo)
+            logAudit("CALL_LOG", "Queried last call")
+            return@withContext ExecutionResult(callInfo, "Last Call Query", handledLocally = true)
+        }
+
+        // 20. FAST LOCAL ROUTE: YouTube Song Auto Play
+        if (lower.startsWith("play ") || lower.contains("chala do") || lower.contains("chalao") || lower.contains("gaana") || lower.contains("bhajan")) {
+            val songName = query.replace("(?i)(play|song|gaana|bhajan|chala do|chalao|suno)".toRegex(), "").trim()
+            val targetSong = if (songName.isNotBlank()) songName else "Hanuman Chalisa"
+            deviceController.playSongOnYouTube(targetSong)
+            val msg = "Playing $targetSong on YouTube."
+            speak(msg)
+            logAudit("MEDIA", "Playing YouTube: $targetSong")
+            return@withContext ExecutionResult(msg, "Play: $targetSong", handledLocally = true)
+        }
+
+        // 21. FAST LOCAL ROUTE: Pause / Stop Music
+        if (lower.contains("stop music") || lower.contains("pause music") || lower.contains("music band") || lower.contains("gaana band")) {
+            deviceController.pauseMusicPlayback()
+            val msg = "Music playback stopped."
+            speak(msg)
+            logAudit("MEDIA", "Music stopped")
+            return@withContext ExecutionResult(msg, "Stop Music", handledLocally = true)
+        }
+
+        // 22. FAST LOCAL ROUTE: Scheduled DND & Music Timers
+        if (lower.contains("dnd after") || lower.contains("minute baad dnd") || lower.contains("min baad dnd")) {
+            val mins = extractMinutes(lower) ?: 5
+            val triggerMs = System.currentTimeMillis() + (mins * 60 * 1000L)
+            deviceController.scheduleExactTask(
+                triggerEpochMs = triggerMs,
+                title = "Auto DND",
+                taskType = "DND_ON"
+            )
+            val msg = "Do Not Disturb mode will turn on in $mins minutes."
+            speak(msg)
+            logAudit("SCHEDULE", "Scheduled DND in $mins min")
+            return@withContext ExecutionResult(msg, "DND in $mins min", handledLocally = true)
+        }
+
+        if (lower.contains("music band kar dena") || lower.contains("stop music after") || lower.contains("minute baad gaana band")) {
+            val mins = extractMinutes(lower) ?: 30
+            val triggerMs = System.currentTimeMillis() + (mins * 60 * 1000L)
+            deviceController.scheduleExactTask(
+                triggerEpochMs = triggerMs,
+                title = "Stop Music",
+                taskType = "STOP_MUSIC"
+            )
+            val msg = "Music will automatically stop after $mins minutes."
+            speak(msg)
+            logAudit("SCHEDULE", "Scheduled Music Stop in $mins min")
+            return@withContext ExecutionResult(msg, "Music timer: $mins min", handledLocally = true)
+        }
+
+        // 23. FAST LOCAL ROUTE: Direct Background SMS without touch
+        if (lower.startsWith("send sms") || lower.contains("sms bhejo") || lower.contains("sms karo") || lower.contains("message bhej do")) {
+            val parts = query.split(" to ", " ko ", ignoreCase = true)
+            val recipient = if (parts.size > 1) parts[1].trim() else ""
+            val messageText = query.replace("(?i)(send sms|sms bhejo|sms karo|message bhej do| to .*| ko .*)".toRegex(), "").trim()
+            val cleanMsg = if (messageText.isNotBlank()) messageText else "Hello from AAYA!"
+
+            val match = if (recipient.isNotBlank()) contactMatcher.resolveAndFindContact(recipient) else null
+            if (match != null) {
+                deviceController.sendDirectSms(match.phoneNumber, cleanMsg)
+                val msg = "Sent SMS to ${match.contactName}: \"$cleanMsg\""
+                speak(msg)
+                logAudit("SMS", "Direct SMS to ${match.contactName}")
+                return@withContext ExecutionResult(msg, "SMS: ${match.contactName}", handledLocally = true)
+            }
+        }
+
+        // 24. FAST LOCAL ROUTE: Deep Memory & Recall (Timetable, Medicine, Family Names)
+        if (lower.contains("kya hai") || lower.contains("batao") || lower.contains("naam") || lower.contains("timetable") || lower.contains("medicine") || lower.contains("dawai")) {
+            val memAns = searchSavedMemory(query)
+            if (memAns != null) {
+                speak(memAns)
+                logAudit("MEMORY", "Recalled: $memAns")
+                return@withContext ExecutionResult(memAns, "Memory Recall", handledLocally = true)
+            }
+        }
+
+        // 25. FAST LOCAL ROUTE: Free Web Intelligence (Weather & Instant DuckDuckGo Answers)
+        val instantAns = com.aaya.assistant.engine.web.WebIntelligenceEngine.getInstantAnswer(query)
+        if (instantAns != null) {
+            speak(instantAns)
+            logAudit("WEB_INTEL", "Instant answer for: $query")
+            return@withContext ExecutionResult(instantAns, "Web Intelligence", handledLocally = true)
+        }
+
+        // 26. COMPLEX / AI ROUTE: Forward to Gemini 3.6 Flash AI Brain with Multi-Action Tool Calling
         val userMemories = try {
             db.aayaDao().getMemoryByCategory("routine")
         } catch (e: Exception) {
@@ -722,5 +823,75 @@ class CommandRouter(
 
             else -> "Other"
         }
+    }
+
+    suspend fun routeCommand(rawSpokenText: String): ExecutionResult {
+        return routeAndExecute(rawSpokenText)
+    }
+
+    private fun getLastCallSummary(): String {
+        return try {
+            val cursor = context.contentResolver.query(
+                android.provider.CallLog.Calls.CONTENT_URI,
+                arrayOf(
+                    android.provider.CallLog.Calls.CACHED_NAME,
+                    android.provider.CallLog.Calls.NUMBER,
+                    android.provider.CallLog.Calls.TYPE,
+                    android.provider.CallLog.Calls.DATE
+                ),
+                null,
+                null,
+                "${android.provider.CallLog.Calls.DATE} DESC LIMIT 1"
+            )
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val name = it.getString(0)
+                    val number = it.getString(1)
+                    val type = it.getInt(2)
+                    val date = it.getLong(3)
+
+                    val caller = if (!name.isNullOrBlank()) name else number
+                    val typeStr = when (type) {
+                        android.provider.CallLog.Calls.INCOMING_TYPE -> "incoming"
+                        android.provider.CallLog.Calls.OUTGOING_TYPE -> "outgoing"
+                        android.provider.CallLog.Calls.MISSED_TYPE -> "missed"
+                        else -> "call"
+                    }
+                    val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(date))
+                    "Aakhiri call $caller ki $typeStr thi, $timeStr par."
+                } else {
+                    "Call log me koi recent call nahi mili."
+                }
+            } ?: "Call log access nahi ho paaya."
+        } catch (e: Exception) {
+            "Call log dekhne ke liye Call Log permission allow kijiye."
+        }
+    }
+
+    private suspend fun searchSavedMemory(query: String): String? {
+        val lower = query.lowercase(Locale.ROOT)
+        val searchTerm = when {
+            lower.contains("dawai") || lower.contains("medicine") || lower.contains("goli") -> "medicine"
+            lower.contains("timetable") || lower.contains("schedule") || lower.contains("class") -> "timetable"
+            lower.contains("papa") || lower.contains("father") || lower.contains("dad") -> "father"
+            lower.contains("mummy") || lower.contains("mother") || lower.contains("mom") || lower.contains("maa") -> "mother"
+            else -> query.replace("(?i)(mera|meri|mere|kya hai|batao|what is|tell me|my)".toRegex(), "").trim()
+        }
+
+        if (searchTerm.isBlank()) return null
+
+        val results = db.aayaDao().searchMemory(searchTerm)
+        if (results.isNotEmpty()) {
+            val item = results.first()
+            return "Aapka ${item.key} hai: ${item.value}"
+        }
+
+        val notes = db.aayaDao().searchNotes(searchTerm)
+        if (notes.isNotEmpty()) {
+            val note = notes.first()
+            return "Aapke notes me mila: ${note.title} - ${note.content}"
+        }
+
+        return null
     }
 }

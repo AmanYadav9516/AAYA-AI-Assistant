@@ -382,4 +382,77 @@ class DeviceController(private val context: Context) {
         strobeThread = null
         toggleFlashlight(false)
     }
+
+    // Direct Background SMS without touch
+    fun sendDirectSms(phoneNumber: String, message: String): Boolean {
+        return try {
+            val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.getSystemService(android.telephony.SmsManager::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                android.telephony.SmsManager.getDefault()
+            }
+            smsManager.sendTextMessage(phoneNumber.trim(), null, message, null, null)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // Auto Play Song on YouTube
+    fun playSongOnYouTube(songName: String): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_SEARCH).apply {
+                setPackage("com.google.android.youtube")
+                putExtra("query", songName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            try {
+                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=${Uri.encode(songName)}")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(webIntent)
+                true
+            } catch (ex: Exception) {
+                false
+            }
+        }
+    }
+
+    // Pause / Stop Music playback via Audio Focus
+    fun pauseMusicPlayback(): Boolean {
+        return try {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val focusRequest = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .build()
+                am.requestAudioFocus(focusRequest)
+            } else {
+                @Suppress("DEPRECATION")
+                am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // Save Contact to Phonebook
+    fun saveContact(name: String, phoneNumber: String): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_INSERT).apply {
+                type = android.provider.ContactsContract.RawContacts.CONTENT_TYPE
+                putExtra(android.provider.ContactsContract.Intents.Insert.NAME, name)
+                putExtra(android.provider.ContactsContract.Intents.Insert.PHONE, phoneNumber)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 }

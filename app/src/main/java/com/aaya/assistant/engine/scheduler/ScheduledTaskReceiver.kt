@@ -57,6 +57,30 @@ class ScheduledTaskReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
         when (taskType) {
+            "DND_ON" -> {
+                notifBuilder.setContentTitle("🌙 DND Activated")
+                    .setContentText("Do Not Disturb mode automatically turned on as scheduled.")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && notificationManager.isNotificationPolicyAccessGranted) {
+                    notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+                }
+                (context.applicationContext as? AayaApplication)?.ttsManager?.speak("DND mode turned on as scheduled.")
+            }
+            "STOP_MUSIC" -> {
+                notifBuilder.setContentTitle("🎵 Music Stopped")
+                    .setContentText("Music paused automatically as scheduled.")
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val focusRequest = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).build()
+                    audioManager.requestAudioFocus(focusRequest)
+                } else {
+                    @Suppress("DEPRECATION")
+                    audioManager.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                }
+                (context.applicationContext as? AayaApplication)?.ttsManager?.speak("Music playback stopped.")
+            }
+            "MEDICINE_REMINDER" -> {
+                com.aaya.assistant.engine.wellness.MedicineAlertActivity.launch(context, title)
+            }
             "CALL_REMINDER" -> {
                 notifBuilder.setContentTitle("📞 Call Reminder: $targetData")
                     .setContentText("Time to call $targetData. Tap to open or call directly.")

@@ -19,6 +19,12 @@ interface AayaDao {
     @Query("SELECT * FROM aaya_memory WHERE `key` = :key LIMIT 1")
     suspend fun getMemoryByKey(key: String): MemoryItem?
 
+    @Query("SELECT * FROM aaya_memory WHERE `key` LIKE '%' || :query || '%' OR value LIKE '%' || :query || '%' OR category LIKE '%' || :query || '%'")
+    suspend fun searchMemory(query: String): List<MemoryItem>
+
+    @Query("SELECT * FROM aaya_memory")
+    suspend fun getAllMemoryList(): List<MemoryItem>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMemory(item: MemoryItem): Long
 

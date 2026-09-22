@@ -39,6 +39,12 @@ fun ApiSettingsScreen() {
     var isAutoSleep by remember { mutableStateOf(prefs.isAutoSleepEnabled) }
     var isDrivingAuto by remember { mutableStateOf(prefs.isDrivingModeAuto) }
     var isWaterReminder by remember { mutableStateOf(prefs.isWaterReminderEnabled) }
+    var selectedLang by remember { mutableStateOf(prefs.selectedLanguage) }
+    var isWakeWord by remember { mutableStateOf(prefs.isWakeWordEnabled) }
+    var isCallAnnounce by remember { mutableStateOf(prefs.isDrivingCallAnnounceEnabled) }
+    var isAutoSpeaker by remember { mutableStateOf(prefs.isAutoAnswerSpeakerEnabled) }
+    var emergencyPhone by remember { mutableStateOf(prefs.emergencyContactPhone) }
+    var emergencyName by remember { mutableStateOf(prefs.emergencyContactName) }
 
     var showVoiceDialog by remember { mutableStateOf(false) }
     var isTestingConnection by remember { mutableStateOf(false) }
@@ -368,6 +374,148 @@ fun ApiSettingsScreen() {
                         colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
                     )
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Language & Speech Localization Card
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = GlassSurface),
+            modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Translate, contentDescription = null, tint = NeonCyan)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("🌐 Language & Localization", fontWeight = FontWeight.Bold, color = TextPrimary)
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("HINGLISH" to "Hinglish", "HINDI" to "हिंदी (Hindi)", "ENGLISH" to "English").forEach { (langKey, label) ->
+                        FilterChip(
+                            selected = selectedLang.uppercase() == langKey,
+                            onClick = {
+                                selectedLang = langKey
+                                prefs.selectedLanguage = langKey
+                            },
+                            label = { Text(label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RadiantPurple,
+                                selectedLabelColor = TextPrimary
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Background Companion & Driving Mode Card
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = GlassSurface),
+            modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = NeonCyan)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("🚗 Background Wake & Driving Mode", fontWeight = FontWeight.Bold, color = TextPrimary)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Background 'Hey AAYA' Wake-Word", color = TextPrimary, fontSize = 14.sp)
+                        Text("Listens when screen is ON across WhatsApp, YouTube, and games", fontSize = 12.sp, color = TextSecondary)
+                    }
+                    Switch(
+                        checked = isWakeWord,
+                        onCheckedChange = {
+                            isWakeWord = it
+                            prefs.isWakeWordEnabled = it
+                            if (it) {
+                                com.aaya.assistant.engine.service.WakeWordForegroundService.start(context)
+                            } else {
+                                com.aaya.assistant.engine.service.WakeWordForegroundService.stop(context)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
+                    )
+                }
+
+                Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Driving: Caller Name Announcer", color = TextPrimary, fontSize = 14.sp)
+                        Text("Speaks caller name aloud when phone is ringing", fontSize = 12.sp, color = TextSecondary)
+                    }
+                    Switch(
+                        checked = isCallAnnounce,
+                        onCheckedChange = {
+                            isCallAnnounce = it
+                            prefs.isDrivingCallAnnounceEnabled = it
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
+                    )
+                }
+
+                Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Auto Answer on Speakerphone", color = TextPrimary, fontSize = 14.sp)
+                        Text("Automatically answers incoming calls on speaker while driving", fontSize = 12.sp, color = TextSecondary)
+                    }
+                    Switch(
+                        checked = isAutoSpeaker,
+                        onCheckedChange = {
+                            isAutoSpeaker = it
+                            prefs.isAutoAnswerSpeakerEnabled = it
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
+                    )
+                }
+
+                Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
+
+                OutlinedTextField(
+                    value = emergencyPhone,
+                    onValueChange = {
+                        emergencyPhone = it
+                        prefs.emergencyContactPhone = it
+                    },
+                    label = { Text("Mummy / Emergency Phone Number") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = NeonCyan,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextSecondary
+                    )
+                )
             }
         }
     }

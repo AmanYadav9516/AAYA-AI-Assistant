@@ -89,6 +89,46 @@ class PreferenceManager(context: Context) {
         get() = securePrefs.getBoolean(KEY_WATER_REMINDER, true)
         set(value) = securePrefs.edit().putBoolean(KEY_WATER_REMINDER, value).apply()
 
+    var isInitialSetupDone: Boolean
+        get() = securePrefs.getBoolean(KEY_INITIAL_SETUP_DONE, false)
+        set(value) = securePrefs.edit().putBoolean(KEY_INITIAL_SETUP_DONE, value).apply()
+
+    var isWakeWordEnabled: Boolean
+        get() = securePrefs.getBoolean(KEY_WAKE_WORD_ENABLED, true)
+        set(value) = securePrefs.edit().putBoolean(KEY_WAKE_WORD_ENABLED, value).apply()
+
+    var isDrivingCallAnnounceEnabled: Boolean
+        get() = securePrefs.getBoolean(KEY_DRIVING_CALL_ANNOUNCE, true)
+        set(value) = securePrefs.edit().putBoolean(KEY_DRIVING_CALL_ANNOUNCE, value).apply()
+
+    var isAutoAnswerSpeakerEnabled: Boolean
+        get() = securePrefs.getBoolean(KEY_AUTO_ANSWER_SPEAKER, false)
+        set(value) = securePrefs.edit().putBoolean(KEY_AUTO_ANSWER_SPEAKER, value).apply()
+
+    var selectedLanguage: String
+        get() = securePrefs.getString(KEY_SELECTED_LANGUAGE, "HINGLISH") ?: "HINGLISH"
+        set(value) = securePrefs.edit().putString(KEY_SELECTED_LANGUAGE, value).apply()
+
+    var officeLatitude: Float
+        get() = securePrefs.getFloat(KEY_OFFICE_LAT, 0.0f)
+        set(value) = securePrefs.edit().putFloat(KEY_OFFICE_LAT, value).apply()
+
+    var officeLongitude: Float
+        get() = securePrefs.getFloat(KEY_OFFICE_LNG, 0.0f)
+        set(value) = securePrefs.edit().putFloat(KEY_OFFICE_LNG, value).apply()
+
+    var emergencyContactPhone: String
+        get() = securePrefs.getString(KEY_EMERGENCY_PHONE, "") ?: ""
+        set(value) = securePrefs.edit().putString(KEY_EMERGENCY_PHONE, value.trim()).apply()
+
+    var emergencyContactName: String
+        get() = securePrefs.getString(KEY_EMERGENCY_NAME, "Mummy") ?: "Mummy"
+        set(value) = securePrefs.edit().putString(KEY_EMERGENCY_NAME, value.trim()).apply()
+
+    var instagramDailyLimitMinutes: Int
+        get() = securePrefs.getInt(KEY_INSTA_LIMIT, 60)
+        set(value) = securePrefs.edit().putInt(KEY_INSTA_LIMIT, value).apply()
+
     companion object {
         private const val KEY_API_KEY = "gemini_api_key"
         private const val KEY_ASSISTANT_NAME = "assistant_name"
@@ -108,5 +148,16 @@ class PreferenceManager(context: Context) {
         private const val KEY_AI_PROVIDER = "ai_provider"
         private const val KEY_OPENROUTER_KEY = "openrouter_api_key"
         private const val KEY_WATER_REMINDER = "water_reminder_enabled"
+
+        private const val KEY_INITIAL_SETUP_DONE = "initial_setup_done"
+        private const val KEY_WAKE_WORD_ENABLED = "wake_word_enabled"
+        private const val KEY_DRIVING_CALL_ANNOUNCE = "driving_call_announce"
+        private const val KEY_AUTO_ANSWER_SPEAKER = "auto_answer_speaker"
+        private const val KEY_SELECTED_LANGUAGE = "selected_language"
+        private const val KEY_OFFICE_LAT = "office_lat"
+        private const val KEY_OFFICE_LNG = "office_lng"
+        private const val KEY_EMERGENCY_PHONE = "emergency_phone"
+        private const val KEY_EMERGENCY_NAME = "emergency_name"
+        private const val KEY_INSTA_LIMIT = "insta_limit_minutes"
     }
 }

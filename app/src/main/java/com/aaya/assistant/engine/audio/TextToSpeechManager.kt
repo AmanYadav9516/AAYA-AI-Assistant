@@ -52,6 +52,17 @@ class TextToSpeechManager(
     }
 
     fun applySavedVoiceSettings() {
+        val targetLocale = when (prefs.selectedLanguage.uppercase()) {
+            "HINDI" -> Locale("hi", "IN")
+            "ENGLISH" -> Locale.US
+            else -> Locale.getDefault()
+        }
+        try {
+            tts?.setLanguage(targetLocale)
+        } catch (e: Exception) {
+            // Fallback
+        }
+
         val preset = prefs.voicePreset
         val (pitch, speed) = when (preset.uppercase()) {
             "FEMALE" -> Pair(1.15f, 1.05f)

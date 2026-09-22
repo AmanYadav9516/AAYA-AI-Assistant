@@ -16,6 +16,18 @@ class AayaApplication : Application() {
     lateinit var preferenceManager: PreferenceManager
         private set
 
+    lateinit var ttsManager: com.aaya.assistant.engine.audio.TextToSpeechManager
+        private set
+
+    lateinit var geminiClient: com.aaya.assistant.data.remote.GeminiClient
+        private set
+
+    lateinit var contactMatcher: com.aaya.assistant.engine.contacts.MultilingualContactMatcher
+        private set
+
+    lateinit var commandRouter: com.aaya.assistant.engine.router.CommandRouter
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -28,6 +40,15 @@ class AayaApplication : Application() {
 
         try {
             database = AayaDatabase.getInstance(this)
+        } catch (t: Throwable) {
+            // Safeguarded
+        }
+
+        try {
+            ttsManager = com.aaya.assistant.engine.audio.TextToSpeechManager(this)
+            geminiClient = com.aaya.assistant.data.remote.GeminiClient(preferenceManager)
+            contactMatcher = com.aaya.assistant.engine.contacts.MultilingualContactMatcher(this)
+            commandRouter = com.aaya.assistant.engine.router.CommandRouter(this, ttsManager, geminiClient, contactMatcher)
         } catch (t: Throwable) {
             // Safeguarded
         }

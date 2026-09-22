@@ -48,29 +48,28 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat << 'EOF' > release_notes.md
-          ## 🌟 AAYA v2.0.0 — The Mega Companion & Intelligence Upgrade
+          ## 🌟 AAYA v3.0.0 — Sovereign Voice Companion & Life Automation
 
           ### 📲 Direct 1-Click Download Links:
-          * **[Download AAYA v2.0.0 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v2.0.0/app-debug.apk)**
-          * **[Download AAYA v2.0.0 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v2.0.0/AAYA-Assistant.zip)**
+          * **[Download AAYA v3.0.0 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.0.0/app-debug.apk)**
+          * **[Download AAYA v3.0.0 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.0.0/AAYA-Assistant.zip)**
 
-          ### 🚀 What's New in v2.0.0:
-          - ⚡ **Multi-AI Engine & Failover**: Google Gemini (`gemini-3.6-flash`) with automatic 503 retry + OpenRouter free tier fallback (`llama-3.3-70b` / `gemini-2.0-flash`). Switchable in Settings.
-          - 🎙️ **Voice Studio & Speech Customizer**: 5 distinct voice presets (Female, Male, Child, Old Man, Robot) + fine-tune Pitch and Speed sliders with 1-tap live voice test.
-          - 🔇 **Zero Command Repetition**: Instant flush of prior TTS speech queue (`stop()` barge-in) and cleaned command history so assistant never echoes previous actions.
-          - 🪔 **Indian Hindu & National Festival Generator**: Automatic detection of upcoming Indian festivals (Diwali, Holi, Raksha Bandhan, Eid, Independence Day) with beautiful heart-touching wishes for all people and 1-tap WhatsApp sharing.
-          - ☀️ **Bilingual Daily Inspiration ("Suvichar")**: Curated morning and daily motivational quotes in Hindi and English by Swami Vivekananda, APJ Abdul Kalam, and more, complete with voice playback.
-          - 💧 **Water & Rest Guardian**: Caring proactive notifications addressing you by your name ("Hey Manish, drink water & take rest!").
-          - 💰 **Voice Pocket Expense Tracker ("Hisab-Kitab")**: Log daily expenses ("Chai ₹20", "Auto ₹60") by voice and track total spends today and all-time in the Personal Hub.
-          - 🚨 **Emergency SOS Beacon**: Fast voice-activated flashlight strobe beacon for night safety or emergency defense.
-          - 🔋 **Smart Battery 100% Unplug Alert**: Audio chime when phone reaches full charge to extend battery health.
-          - 💬 **WhatsApp Dictation & Messaging**: Compose and send WhatsApp messages directly via hands-free voice intent.
-          - 🛡️ **100% On-Device Local Room Storage**: Zero cloud lock-in; expenses, notes, reminders, and user profiles remain 100% local and private.
+          ### 🚀 What's New in v3.0.0:
+          - 🎙️ **Background Wake-Word & Floating Overlay**: Say "Hey AAYA", "AAYA Suno", or "AAYA" anytime while screen is ON across WhatsApp, YouTube, or games! Siri-style glowing neon pill overlay drops volume and listens.
+          - 🚗 **Driving Mode & Caller Announcer**: Speaks incoming caller name aloud over ringtone. Say "Uthao" to auto-answer on speakerphone!
+          - 📍 **Smart Location Commander (Geofencing)**: "Office pahuchte hi mummy ko auto message kar dena" — automatically dispatches SMS on arrival without opening any screen.
+          - 💊 **Dawai Wala Doctor**: Persistent caring voice alarm at medicine time repeating until you say "Pee li".
+          - ⏱️ **App Usage Police**: Automatically warns and exits distracting apps like Instagram when daily limit is reached.
+          - 📸 **Hands-Free Voice Camera**: "Ek photo kheench de" triggers a 3-second audio countdown ("Smile! 3... 2... 1...") and snaps a photo without touching.
+          - 🎵 **YouTube Auto-Play & Music Sleep Timer**: "Hanuman Chalisa chala de" opens and plays immediately; "30 min baad gaana band kar dena" automatically pauses media.
+          - 🧠 **Deep Memory & Natural Recall**: Ask "Mera timetable kya hai", "Meri dawai ka naam kya hai", "Papa ka naam kya hai", or "Aakhiri call kiski thi".
+          - 🌐 **Web Intelligence & Hindi/Hinglish Voice**: Instant weather and facts without burning AI tokens; native Hindi (हिंदी) and Hinglish speech support.
+          - 🛡️ **100% On-Device Privacy Guaranteed**: Room SQLite database keeps all your data strictly on your phone.
           EOF
 
-          gh release delete v2.0.0 --yes || true
-          gh release create v2.0.0 \
+          gh release delete v3.0.0 --yes || true
+          gh release create v3.0.0 \
             app/build/outputs/apk/debug/app-debug.apk \
             AAYA-Assistant.zip \
-            --title "AAYA AI Assistant v2.0.0 APK (Mega Companion Upgrade)" \
+            --title "AAYA AI Assistant v3.0.0 APK (Sovereign Companion Upgrade)" \
             --notes-file release_notes.md
