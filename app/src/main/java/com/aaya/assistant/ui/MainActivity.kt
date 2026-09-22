@@ -229,6 +229,7 @@ fun MainAppScaffold(
     onStopSpeech: () -> Unit,
     onSuggestionClicked: (String) -> Unit,
     onDismissVoiceSheet: () -> Unit
+) {
     val app = AayaApplication.instance
     val initialNav = if (!app.preferenceManager.isInitialSetupDone) 3 else 0
     var currentNavIndex by remember { mutableIntStateOf(initialNav) }
