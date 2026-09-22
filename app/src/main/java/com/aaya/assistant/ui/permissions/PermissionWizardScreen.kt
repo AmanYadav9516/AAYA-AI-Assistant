@@ -43,7 +43,8 @@ data class PermissionStep(
     val privacyGuarantee: String,
     val isGranted: Boolean,
     val permissionManifestKey: String? = null,
-    val isSpecialAccess: Boolean = false
+    val isSpecialAccess: Boolean = false,
+    val customIntentAction: String? = null
 )
 
 @Composable
@@ -106,6 +107,18 @@ fun PermissionWizardScreen(onAllGranted: () -> Unit) {
                     step = step,
                     onEnableClick = {
                         when {
+                            step.customIntentAction != null -> {
+                                try {
+                                    val intent = Intent(step.customIntentAction)
+                                    if (step.customIntentAction == Settings.ACTION_MANAGE_OVERLAY_PERMISSION) {
+                                        intent.data = Uri.parse("package:${context.packageName}")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    val intent = Intent(Settings.ACTION_SETTINGS)
+                                    context.startActivity(intent)
+                                }
+                            }
                             step.isSpecialAccess -> {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                                     val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
@@ -334,6 +347,33 @@ private fun computePermissionSteps(context: Context): List<PermissionStep> {
             privacyGuarantee = "Allows AAYA to silence ordinary calls while keeping VIP emergency calls ringing.",
             isGranted = isDndGranted,
             isSpecialAccess = true
+        ),
+        PermissionStep(
+            id = 6,
+            title = "Display Over Other Apps",
+            icon = Icons.Default.Layers,
+            description = "Allows Siri-style floating pop-up overlay over WhatsApp, YouTube, and games.",
+            privacyGuarantee = "Renders only when activated by you. Never intercepts your screen contents.",
+            isGranted = Settings.canDrawOverlays(context),
+            customIntentAction = Settings.ACTION_MANAGE_OVERLAY_PERMISSION
+        ),
+        PermissionStep(
+            id = 7,
+            title = "Default Digital Assistant",
+            icon = Icons.Default.Bolt,
+            description = "Enables long-press power button (0.5s) to instantly summon AAYA with 0% idle battery drain.",
+            privacyGuarantee = "Replaces default assistant for faster access on Realme, Oppo, OnePlus and all Android phones.",
+            isGranted = true, // User can re-configure anytime
+            customIntentAction = Settings.ACTION_VOICE_INPUT_SETTINGS
+        ),
+        PermissionStep(
+            id = 8,
+            title = "Accessibility (Voice Screenshot)",
+            icon = Icons.Default.CameraAlt,
+            description = "Enables touchless voice screenshots ('Take screenshot') and gesture navigation.",
+            privacyGuarantee = "Used solely for global screenshot capture. No personal data collected.",
+            isGranted = com.aaya.assistant.engine.service.HardwareKeyAccessibilityService.isServiceRunning(),
+            customIntentAction = Settings.ACTION_ACCESSIBILITY_SETTINGS
         )
     )
 }

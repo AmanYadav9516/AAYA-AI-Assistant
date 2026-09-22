@@ -4,5 +4,6 @@
     <string name="wake_word">Hey AAYA</string>
     <string name="listening">Listening to you…</string>
     <string name="tap_to_speak">Tap orb or shake device to speak</string>
-    <string name="accessibility_service_desc">Enables AAYA to detect the Volume Up + Volume Down shortcut when the screen is active to wake up your assistant hands-free.</string>
+    <string name="accessibility_service_description">AAYA Assistant Accessibility Service allows hands-free voice screenshots, system navigation, and instant activation via accessibility shortcut.</string>
+    <string name="accessibility_service_desc">AAYA Assistant Accessibility Service allows hands-free voice screenshots, system navigation, and instant activation via accessibility shortcut.</string>
 </resources>

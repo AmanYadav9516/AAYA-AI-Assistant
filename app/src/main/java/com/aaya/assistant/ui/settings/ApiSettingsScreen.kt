@@ -42,10 +42,6 @@ fun ApiSettingsScreen() {
     var isWaterReminder by remember { mutableStateOf(prefs.isWaterReminderEnabled) }
     var selectedLang by remember { mutableStateOf(prefs.selectedLanguage) }
     var isWakeWord by remember { mutableStateOf(prefs.isWakeWordEnabled) }
-    var isVolumeWake by remember { mutableStateOf(prefs.isVolumeWakeEnabled) }
-    var isNotifWake by remember { mutableStateOf(prefs.isNotificationWakeEnabled) }
-    var isTileWake by remember { mutableStateOf(prefs.isTileWakeEnabled) }
-    var isBtWake by remember { mutableStateOf(prefs.isBluetoothWakeEnabled) }
     var isCallAnnounce by remember { mutableStateOf(prefs.isDrivingCallAnnounceEnabled) }
     var isAutoSpeaker by remember { mutableStateOf(prefs.isAutoAnswerSpeakerEnabled) }
     var emergencyPhone by remember { mutableStateOf(prefs.emergencyContactPhone) }
@@ -54,6 +50,8 @@ fun ApiSettingsScreen() {
     var showVoiceDialog by remember { mutableStateOf(false) }
     var isTestingConnection by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<ApiDiagnostics?>(null) }
+    var profileSavedFeedback by remember { mutableStateOf(false) }
+    var apiSavedFeedback by remember { mutableStateOf(false) }
 
     if (showVoiceDialog) {
         VoiceCustomizerDialog(
@@ -111,6 +109,22 @@ fun ApiSettingsScreen() {
                         unfocusedTextColor = TextSecondary
                     )
                 )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = {
+                        prefs.userName = userNameInput.trim()
+                        profileSavedFeedback = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(if (profileSavedFeedback) Icons.Default.Check else Icons.Default.Save, contentDescription = null, tint = DeepIndigoBg)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (profileSavedFeedback) "Profile Saved! ✅" else "Save Profile Info", color = DeepIndigoBg, fontWeight = FontWeight.Bold)
+                }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -210,6 +224,24 @@ fun ApiSettingsScreen() {
                             unfocusedTextColor = TextSecondary
                         )
                     )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = {
+                        prefs.apiKey = apiKeyInput.trim()
+                        prefs.openRouterApiKey = openRouterKeyInput.trim()
+                        prefs.aiProvider = aiProvider
+                        apiSavedFeedback = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(if (apiSavedFeedback) Icons.Default.Check else Icons.Default.Save, contentDescription = null, tint = DeepIndigoBg)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (apiSavedFeedback) "API Keys Saved! ✅" else "Save AI Brain Keys", color = DeepIndigoBg, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -431,155 +463,47 @@ fun ApiSettingsScreen() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = NeonCyan)
+                    Icon(Icons.Default.Bolt, contentDescription = null, tint = NeonCyan)
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("🚗 Background Wake & Driving Mode", fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text("⚡ Power Button Assistant & Driving Mode", fontWeight = FontWeight.Bold, color = TextPrimary)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 1. Voice Wake-Word
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("🎙️ Voice Wake (\"Hey AAYA\")", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Listens when screen is ON across WhatsApp, YouTube, and games", fontSize = 12.sp, color = TextSecondary)
-                    }
-                    Switch(
-                        checked = isWakeWord,
-                        onCheckedChange = {
-                            isWakeWord = it
-                            prefs.isWakeWordEnabled = it
-                            if (it) {
-                                com.aaya.assistant.engine.service.WakeWordForegroundService.start(context)
-                            } else {
-                                com.aaya.assistant.engine.service.WakeWordForegroundService.stop(context)
-                            }
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
-                    )
-                }
-
-                Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
-
-                // 2. Volume Up + Down Shortcut
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("🔘 Volume Up + Down Shortcut", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Press both volume buttons together to wake AAYA immediately", fontSize = 12.sp, color = TextSecondary)
-                    }
-                    Switch(
-                        checked = isVolumeWake,
-                        onCheckedChange = {
-                            isVolumeWake = it
-                            prefs.isVolumeWakeEnabled = it
-                            if (it) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Hold Power Button (0.5s) to Summon AAYA", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("Summons Siri-style floating overlay over any app. 0% idle battery drain!", fontSize = 12.sp, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
                                 try {
-                                    val intent = android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-                                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
                                     context.startActivity(intent)
                                 } catch (e: Exception) {
-                                    // Ignore
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+                                    context.startActivity(intent)
                                 }
-                            }
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
-                    )
-                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = RadiantPurple),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Set Default Assistant", fontSize = 12.sp, color = TextPrimary)
+                        }
 
-                Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
-
-                // 3. Quick Settings Tile
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("⚡ Quick Settings Drawer Tile", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Add 'AAYA Assistant' tile in your phone's notification panel for 1-tap wake", fontSize = 12.sp, color = TextSecondary)
-                    }
-                    Switch(
-                        checked = isTileWake,
-                        onCheckedChange = {
-                            isTileWake = it
-                            prefs.isTileWakeEnabled = it
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
-                    )
-                }
-
-                Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
-
-                // 4. Notification Action Button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("🔔 Notification 'Ask AAYA' Button", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Adds a permanent [🎙️ Ask AAYA] button to the notification bar", fontSize = 12.sp, color = TextSecondary)
-                    }
-                    Switch(
-                        checked = isNotifWake,
-                        onCheckedChange = {
-                            isNotifWake = it
-                            prefs.isNotificationWakeEnabled = it
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
-                    )
-                }
-
-                Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
-
-                // 5. Bluetooth Headset Button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("🎧 Bluetooth Earphone Button", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Double-press or hold call/media button on Bluetooth headset to wake AAYA", fontSize = 12.sp, color = TextSecondary)
-                    }
-                    Switch(
-                        checked = isBtWake,
-                        onCheckedChange = {
-                            isBtWake = it
-                            prefs.isBluetoothWakeEnabled = it
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan)
-                    )
-                }
-
-                Divider(modifier = Modifier.padding(vertical = 10.dp), color = CardBorder)
-
-                // Realme / Oppo / Vivo Tip Box
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(SurfaceDark.copy(alpha = 0.6f))
-                        .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
-                        .padding(12.dp)
-                ) {
-                    Column {
-                        Text("💡 Realme / Oppo / Vivo User Tip:", fontWeight = FontWeight.Bold, color = GoldAccent, fontSize = 13.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "ColorOS/Realme UI kills background apps. For 100% reliable wake: Open Settings → Battery → AAYA → Set 'Don't Optimize' and enable 'Auto-launch' in Phone Manager.",
-                            fontSize = 11.sp,
-                            color = TextSecondary
-                        )
+                        Button(
+                            onClick = {
+                                AayaApplication.instance.voiceSessionManager.wakeAaya(com.aaya.assistant.engine.session.TriggerSource.IN_APP)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Test Overlay 🎙️", fontSize = 12.sp, color = DeepIndigoBg, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 

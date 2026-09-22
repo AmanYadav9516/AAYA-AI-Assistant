@@ -235,6 +235,14 @@ fun MainAppScaffold(
     var currentNavIndex by remember { mutableIntStateOf(initialNav) }
     val scope = rememberCoroutineScope()
 
+    androidx.activity.compose.BackHandler(enabled = showVoiceSheet || currentNavIndex != 0) {
+        if (showVoiceSheet) {
+            onDismissVoiceSheet()
+        } else if (currentNavIndex != 0) {
+            currentNavIndex = 0
+        }
+    }
+
     var showVoiceCustomizer by remember { mutableStateOf(false) }
     var selectedFestivalForDialog by remember { mutableStateOf<com.aaya.assistant.data.model.FestivalModel?>(null) }
 

@@ -48,31 +48,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat << 'EOF' > release_notes.md
-          ## 🌟 AAYA v3.1.0 — Sovereign Voice Architecture & Multi-Modal Wake Engine
+          ## 🌟 AAYA v3.1.0 — Power-Button System Assistant & Multi-Command Engine
 
           ### 📲 Direct 1-Click Download Links:
           * **[Download AAYA v3.1.0 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.1.0/app-debug.apk)**
           * **[Download AAYA v3.1.0 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.1.0/AAYA-Assistant.zip)**
 
           ### 🚀 What's New in v3.1.0:
-          - 🧠 **Unified VoiceSessionManager & Strict State Machine**:
-            - Fixed premature speech cutoff! Supports seamless **Single-Breath** ("Hey AAYA make a call to mom") and **Two-Stage** ("Hey AAYA" -> prompt -> "Call mom") voice commands.
-            - Permanently eliminated mic rapid on-off flickering and beep loops.
-            - Mutes microphone during AAYA speech (TTS) to strictly prevent self-voice feedback loops.
-          - ⚡ **Multi-Modal Wake Activation**:
-            - 🎙️ **Voice Wake**: "Hey AAYA", "AAYA Suno", "Suno AAYA" while screen is ON.
-            - 🔘 **Hardware Shortcut**: Press **Volume Up + Volume Down** simultaneously to wake AAYA immediately from any app or game.
-            - ⚡ **Quick Settings Tile**: Added **"AAYA Assistant"** tile to the notification drawer for instant 1-tap activation.
-            - 🔔 **Permanent Notification Action**: Added interactive **[ 🎙️ Ask AAYA ]** button in the notification panel.
-            - 🎧 **Bluetooth Earphone Button**: Double-press or hold call/media button on Bluetooth headsets/earphones to wake hands-free.
-            - 📳 **Shake to Wake**: Shake device with custom sensitivity to wake AAYA.
-          - 💡 **Realme / Oppo / Vivo Optimization Guide**: Clear in-app guidance for ColorOS/Realme UI auto-launch and battery settings.
-          - 🛡️ **100% On-Device Privacy Guaranteed**: Room SQLite database keeps all your data strictly on your phone.
+          - ⚡ **Power-Button & Default Assistant (0% Idle Battery Drain)**: Long-press power button (0.5s) on Realme, Oppo, OnePlus & any Android device or use corner swipe to instantly summon AAYA!
+          - 🫧 **Siri Floating Overlay (No Full App Open)**: Triggers translucent overlay over WhatsApp, YouTube, and games without interrupting your foreground app. Audio automatically ducks by 80%.
+          - 🔗 **Multi-Command Queue**: Handles chained commands in a single breath (*"Set medicine reminder for 5 min AND call mom"*).
+          - 📸 **Voice Screenshots**: Say *"Take screenshot"* or *"Screenshot lo"* to snap screen touch-free via Android Accessibility Service.
+          - 🔙 **Jetpack Compose Navigation Fix**: Back button on Settings, Memory, and Routines tabs returns to Home screen instead of quitting the app.
+          - 💾 **Dedicated Save/Edit Profile Controls**: Visual Save buttons with green checkmarks for User Name, Assistant Name, and API keys.
+          - 🛡️ **Special Permissions Wizard**: 1-click links for Realme, Oppo, and OnePlus Special App Access (Display Over Apps, Default Assistant, Accessibility).
+          - 🚗 **Driving Mode & Caller Announcer**: Speaks caller name aloud over ringtone. Say "Uthao" to answer on speakerphone!
+          - 💊 **Persistent Dawai Doctor & Health Reminders**: Continuous voice reminders until you say "Pee li".
+          - 🌐 **Free Web Intelligence & Offline Commands**: Instant weather and facts without consuming AI tokens.
+          - 🔒 **100% On-Device Local SQLite Privacy**: All memories, schedules, and notes stay strictly on your phone.
           EOF
 
           gh release delete v3.1.0 --yes || true
           gh release create v3.1.0 \
             app/build/outputs/apk/debug/app-debug.apk \
             AAYA-Assistant.zip \
-            --title "AAYA AI Assistant v3.1.0 APK (VoiceSessionManager & Multi-Modal Wake)" \
+            --title "AAYA AI Assistant v3.1.0 APK (Power-Button System Upgrade)" \
             --notes-file release_notes.md

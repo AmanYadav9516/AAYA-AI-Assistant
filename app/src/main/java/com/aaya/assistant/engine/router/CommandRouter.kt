@@ -38,7 +38,51 @@ class CommandRouter(
 
     suspend fun routeAndExecute(rawSpokenText: String): ExecutionResult = withContext(Dispatchers.IO) {
         val query = rawSpokenText.trim()
+        if (query.isBlank()) {
+            return@withContext ExecutionResult("I am listening. How can I help you?", "Idle", handledLocally = true)
+        }
+
+        // Multi-Command Queue / Chained Execution (e.g. "Set reminder for 5 min AND call Mom")
+        val conjunctionRegex = "(?i)\\s+(?:and\\s+then|and\\s+after|and|aur|phir|ke\\s+baad|then)\\s+".toRegex()
+        if (query.contains(conjunctionRegex)) {
+            val subCommands = query.split(conjunctionRegex).map { it.trim() }.filter { it.isNotBlank() }
+            if (subCommands.size > 1) {
+                val results = mutableListOf<ExecutionResult>()
+                for (sub in subCommands) {
+                    val res = executeSingleRoute(sub)
+                    results.add(res)
+                    delay(400)
+                }
+                val combinedSpeech = results.joinToString(". ") { it.speechResponse }
+                val combinedSummary = results.mapNotNull { it.actionSummary }.filter { it.isNotBlank() }.joinToString(" + ")
+                return@withContext ExecutionResult(combinedSpeech, combinedSummary, handledLocally = true)
+            }
+        }
+
+        return@withContext executeSingleRoute(query)
+    }
+
+    private suspend fun executeSingleRoute(query: String): ExecutionResult = withContext(Dispatchers.IO) {
         val lower = query.lowercase()
+
+        // 0. Voice Screenshot & Global Navigation Actions
+        if (lower.contains("screenshot") || lower.contains("screen shot")) {
+            val success = com.aaya.assistant.engine.service.HardwareKeyAccessibilityService.takeScreenshot()
+            val msg = if (success) {
+                "Screenshot captured."
+            } else {
+                "Please enable AAYA in Accessibility Settings to take screenshots."
+            }
+            speak(msg)
+            logAudit("ACCESSIBILITY", if (success) "Captured screenshot" else "Failed screenshot - permission needed")
+            return@withContext ExecutionResult(msg, "Voice Screenshot", handledLocally = true)
+        }
+        if (lower.contains("go home") || lower.contains("home screen") || lower.contains("home jao")) {
+            val success = com.aaya.assistant.engine.service.HardwareKeyAccessibilityService.pressHome()
+            val msg = if (success) "Going home." else "Returning to home screen."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Go Home", handledLocally = true)
+        }
 
         // 1. FAST LOCAL ROUTE: Flashlight / Torch (100% Offline)
         val isTorchCommand = lower.contains("torch") || lower.contains("flashlight")

@@ -15,8 +15,16 @@ class HardwareKeyAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         serviceInfo = serviceInfo.apply {
             flags = flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (instance == this) {
+            instance = null
         }
     }
 
@@ -58,4 +66,25 @@ class HardwareKeyAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
 
     override fun onInterrupt() {}
+
+    companion object {
+        var instance: HardwareKeyAccessibilityService? = null
+            private set
+
+        fun isServiceRunning(): Boolean = instance != null
+
+        fun takeScreenshot(): Boolean {
+            val service = instance ?: return false
+            return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                service.performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT)
+            } else {
+                false
+            }
+        }
+
+        fun pressHome(): Boolean {
+            val service = instance ?: return false
+            return service.performGlobalAction(GLOBAL_ACTION_HOME)
+        }
+    }
 }

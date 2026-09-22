@@ -87,8 +87,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
 
-            <!-- Voice Assistant Intent Handlers -->
+        <!-- Translucent Voice Trigger Activity for Power-Button Hold & Assist Intent -->
+        <activity
+            android:name=".ui.trigger.VoiceTriggerActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.ASSIST" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -182,23 +189,11 @@
             android:theme="@style/Theme.AayaAssistant"
             android:screenOrientation="portrait" />
 
-        <!-- Quick Settings Tile Service -->
-        <service
-            android:name=".engine.service.AayaTileService"
-            android:icon="@android:drawable/ic_btn_speak_now"
-            android:label="AAYA Assistant"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
-            </intent-filter>
-        </service>
-
-        <!-- Hardware Key Accessibility Service for Volume Up + Down -->
+        <!-- Accessibility Service for Voice Screenshots and Global Navigation -->
         <service
             android:name=".engine.service.HardwareKeyAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
@@ -206,15 +201,6 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
-
-        <!-- Bluetooth Headset Media Button Receiver -->
-        <receiver
-            android:name=".engine.receiver.MediaButtonReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MEDIA_BUTTON" />
-            </intent-filter>
-        </receiver>
     </application>
 
 </manifest>
