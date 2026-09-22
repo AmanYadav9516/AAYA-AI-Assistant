@@ -129,6 +129,22 @@ class PreferenceManager(context: Context) {
         get() = securePrefs.getInt(KEY_INSTA_LIMIT, 60)
         set(value) = securePrefs.edit().putInt(KEY_INSTA_LIMIT, value).apply()
 
+    var isVolumeWakeEnabled: Boolean
+        get() = securePrefs.getBoolean(KEY_VOLUME_WAKE, false)
+        set(value) = securePrefs.edit().putBoolean(KEY_VOLUME_WAKE, value).apply()
+
+    var isNotificationWakeEnabled: Boolean
+        get() = securePrefs.getBoolean(KEY_NOTIFICATION_WAKE, true)
+        set(value) = securePrefs.edit().putBoolean(KEY_NOTIFICATION_WAKE, value).apply()
+
+    var isTileWakeEnabled: Boolean
+        get() = securePrefs.getBoolean(KEY_TILE_WAKE, true)
+        set(value) = securePrefs.edit().putBoolean(KEY_TILE_WAKE, value).apply()
+
+    var isBluetoothWakeEnabled: Boolean
+        get() = securePrefs.getBoolean(KEY_BLUETOOTH_WAKE, true)
+        set(value) = securePrefs.edit().putBoolean(KEY_BLUETOOTH_WAKE, value).apply()
+
     companion object {
         private const val KEY_API_KEY = "gemini_api_key"
         private const val KEY_ASSISTANT_NAME = "assistant_name"
@@ -159,5 +175,9 @@ class PreferenceManager(context: Context) {
         private const val KEY_EMERGENCY_PHONE = "emergency_phone"
         private const val KEY_EMERGENCY_NAME = "emergency_name"
         private const val KEY_INSTA_LIMIT = "insta_limit_minutes"
+        private const val KEY_VOLUME_WAKE = "volume_wake_enabled"
+        private const val KEY_NOTIFICATION_WAKE = "notification_wake_enabled"
+        private const val KEY_TILE_WAKE = "tile_wake_enabled"
+        private const val KEY_BLUETOOTH_WAKE = "bluetooth_wake_enabled"
     }
 }

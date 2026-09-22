@@ -181,6 +181,40 @@
             android:exported="false"
             android:theme="@style/Theme.AayaAssistant"
             android:screenOrientation="portrait" />
+
+        <!-- Quick Settings Tile Service -->
+        <service
+            android:name=".engine.service.AayaTileService"
+            android:icon="@android:drawable/ic_btn_speak_now"
+            android:label="AAYA Assistant"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Hardware Key Accessibility Service for Volume Up + Down -->
+        <service
+            android:name=".engine.service.HardwareKeyAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Bluetooth Headset Media Button Receiver -->
+        <receiver
+            android:name=".engine.receiver.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

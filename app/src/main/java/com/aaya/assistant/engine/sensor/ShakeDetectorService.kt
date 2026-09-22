@@ -88,20 +88,8 @@ class ShakeDetectorService : Service(), SensorEventListener {
     }
 
     private fun onShakeDetected() {
-        // Haptic feedback
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator?.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator?.vibrate(80)
-        }
-
-        // Open AAYA Assistant Overlay in MainActivity
-        val launchIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(MainActivity.EXTRA_TRIGGER_VOICE, true)
-        }
-        startActivity(launchIntent)
+        val app = application as? AayaApplication
+        app?.voiceSessionManager?.wakeAaya(com.aaya.assistant.engine.session.TriggerSource.SHAKE_GESTURE)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}

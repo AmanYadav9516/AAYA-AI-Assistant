@@ -48,28 +48,31 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat << 'EOF' > release_notes.md
-          ## 🌟 AAYA v3.0.0 — Sovereign Voice Companion & Life Automation
+          ## 🌟 AAYA v3.1.0 — Sovereign Voice Architecture & Multi-Modal Wake Engine
 
           ### 📲 Direct 1-Click Download Links:
-          * **[Download AAYA v3.0.0 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.0.0/app-debug.apk)**
-          * **[Download AAYA v3.0.0 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.0.0/AAYA-Assistant.zip)**
+          * **[Download AAYA v3.1.0 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.1.0/app-debug.apk)**
+          * **[Download AAYA v3.1.0 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.1.0/AAYA-Assistant.zip)**
 
-          ### 🚀 What's New in v3.0.0:
-          - 🎙️ **Background Wake-Word & Floating Overlay**: Say "Hey AAYA", "AAYA Suno", or "AAYA" anytime while screen is ON across WhatsApp, YouTube, or games! Siri-style glowing neon pill overlay drops volume and listens.
-          - 🚗 **Driving Mode & Caller Announcer**: Speaks incoming caller name aloud over ringtone. Say "Uthao" to auto-answer on speakerphone!
-          - 📍 **Smart Location Commander (Geofencing)**: "Office pahuchte hi mummy ko auto message kar dena" — automatically dispatches SMS on arrival without opening any screen.
-          - 💊 **Dawai Wala Doctor**: Persistent caring voice alarm at medicine time repeating until you say "Pee li".
-          - ⏱️ **App Usage Police**: Automatically warns and exits distracting apps like Instagram when daily limit is reached.
-          - 📸 **Hands-Free Voice Camera**: "Ek photo kheench de" triggers a 3-second audio countdown ("Smile! 3... 2... 1...") and snaps a photo without touching.
-          - 🎵 **YouTube Auto-Play & Music Sleep Timer**: "Hanuman Chalisa chala de" opens and plays immediately; "30 min baad gaana band kar dena" automatically pauses media.
-          - 🧠 **Deep Memory & Natural Recall**: Ask "Mera timetable kya hai", "Meri dawai ka naam kya hai", "Papa ka naam kya hai", or "Aakhiri call kiski thi".
-          - 🌐 **Web Intelligence & Hindi/Hinglish Voice**: Instant weather and facts without burning AI tokens; native Hindi (हिंदी) and Hinglish speech support.
+          ### 🚀 What's New in v3.1.0:
+          - 🧠 **Unified VoiceSessionManager & Strict State Machine**:
+            - Fixed premature speech cutoff! Supports seamless **Single-Breath** ("Hey AAYA make a call to mom") and **Two-Stage** ("Hey AAYA" -> prompt -> "Call mom") voice commands.
+            - Permanently eliminated mic rapid on-off flickering and beep loops.
+            - Mutes microphone during AAYA speech (TTS) to strictly prevent self-voice feedback loops.
+          - ⚡ **Multi-Modal Wake Activation**:
+            - 🎙️ **Voice Wake**: "Hey AAYA", "AAYA Suno", "Suno AAYA" while screen is ON.
+            - 🔘 **Hardware Shortcut**: Press **Volume Up + Volume Down** simultaneously to wake AAYA immediately from any app or game.
+            - ⚡ **Quick Settings Tile**: Added **"AAYA Assistant"** tile to the notification drawer for instant 1-tap activation.
+            - 🔔 **Permanent Notification Action**: Added interactive **[ 🎙️ Ask AAYA ]** button in the notification panel.
+            - 🎧 **Bluetooth Earphone Button**: Double-press or hold call/media button on Bluetooth headsets/earphones to wake hands-free.
+            - 📳 **Shake to Wake**: Shake device with custom sensitivity to wake AAYA.
+          - 💡 **Realme / Oppo / Vivo Optimization Guide**: Clear in-app guidance for ColorOS/Realme UI auto-launch and battery settings.
           - 🛡️ **100% On-Device Privacy Guaranteed**: Room SQLite database keeps all your data strictly on your phone.
           EOF
 
-          gh release delete v3.0.0 --yes || true
-          gh release create v3.0.0 \
+          gh release delete v3.1.0 --yes || true
+          gh release create v3.1.0 \
             app/build/outputs/apk/debug/app-debug.apk \
             AAYA-Assistant.zip \
-            --title "AAYA AI Assistant v3.0.0 APK (Sovereign Companion Upgrade)" \
+            --title "AAYA AI Assistant v3.1.0 APK (VoiceSessionManager & Multi-Modal Wake)" \
             --notes-file release_notes.md

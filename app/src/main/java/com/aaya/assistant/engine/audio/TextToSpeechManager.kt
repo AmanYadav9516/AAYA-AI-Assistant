@@ -14,12 +14,21 @@ interface TtsCallback {
 
 class TextToSpeechManager(
     private val context: Context,
-    private val callback: TtsCallback? = null
+    var callback: TtsCallback? = null
 ) : TextToSpeech.OnInitListener {
 
     private val prefs = PreferenceManager(context)
     private var tts: TextToSpeech? = TextToSpeech(context.applicationContext, this)
     private var isInitialized: Boolean = false
+    private val callbacks = mutableListOf<TtsCallback>()
+
+    fun addCallback(cb: TtsCallback) {
+        if (!callbacks.contains(cb)) callbacks.add(cb)
+    }
+
+    fun removeCallback(cb: TtsCallback) {
+        callbacks.remove(cb)
+    }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -34,14 +43,17 @@ class TextToSpeechManager(
                 engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         callback?.onSpeechStarted()
+                        callbacks.forEach { it.onSpeechStarted() }
                     }
 
                     override fun onDone(utteranceId: String?) {
                         callback?.onSpeechFinished()
+                        callbacks.forEach { it.onSpeechFinished() }
                     }
 
                     override fun onError(utteranceId: String?) {
                         callback?.onSpeechError("TTS playback error")
+                        callbacks.forEach { it.onSpeechError("TTS playback error") }
                     }
                 })
                 isInitialized = true

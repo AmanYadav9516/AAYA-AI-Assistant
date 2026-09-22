@@ -28,6 +28,9 @@ class AayaApplication : Application() {
     lateinit var commandRouter: com.aaya.assistant.engine.router.CommandRouter
         private set
 
+    lateinit var voiceSessionManager: com.aaya.assistant.engine.session.VoiceSessionManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -49,6 +52,7 @@ class AayaApplication : Application() {
             geminiClient = com.aaya.assistant.data.remote.GeminiClient(preferenceManager)
             contactMatcher = com.aaya.assistant.engine.contacts.MultilingualContactMatcher(this)
             commandRouter = com.aaya.assistant.engine.router.CommandRouter(this, ttsManager, geminiClient, contactMatcher)
+            voiceSessionManager = com.aaya.assistant.engine.session.VoiceSessionManager(this, preferenceManager, ttsManager, commandRouter)
         } catch (t: Throwable) {
             // Safeguarded
         }
