@@ -107,7 +107,7 @@ class VoiceTriggerActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         // User triggered again: start a fresh listening turn
