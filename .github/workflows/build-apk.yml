@@ -48,29 +48,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat << 'EOF' > release_notes.md
-          ## 🌟 AAYA v3.1.0 — Power-Button System Assistant & Multi-Command Engine
+          ## 🌟 AAYA v3.2.0 — Siri Animated Pop-Up & Zero Mic Flicker Upgrade
 
           ### 📲 Direct 1-Click Download Links:
-          * **[Download AAYA v3.1.0 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.1.0/app-debug.apk)**
-          * **[Download AAYA v3.1.0 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.1.0/AAYA-Assistant.zip)**
+          * **[Download AAYA v3.2.0 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.2.0/app-debug.apk)**
+          * **[Download AAYA v3.2.0 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.2.0/AAYA-Assistant.zip)**
 
-          ### 🚀 What's New in v3.1.0:
-          - ⚡ **Power-Button & Default Assistant (0% Idle Battery Drain)**: Long-press power button (0.5s) on Realme, Oppo, OnePlus & any Android device or use corner swipe to instantly summon AAYA!
-          - 🫧 **Siri Floating Overlay (No Full App Open)**: Triggers translucent overlay over WhatsApp, YouTube, and games without interrupting your foreground app. Audio automatically ducks by 80%.
-          - 🔗 **Multi-Command Queue**: Handles chained commands in a single breath (*"Set medicine reminder for 5 min AND call mom"*).
-          - 📸 **Voice Screenshots**: Say *"Take screenshot"* or *"Screenshot lo"* to snap screen touch-free via Android Accessibility Service.
-          - 🔙 **Jetpack Compose Navigation Fix**: Back button on Settings, Memory, and Routines tabs returns to Home screen instead of quitting the app.
-          - 💾 **Dedicated Save/Edit Profile Controls**: Visual Save buttons with green checkmarks for User Name, Assistant Name, and API keys.
-          - 🛡️ **Special Permissions Wizard**: 1-click links for Realme, Oppo, and OnePlus Special App Access (Display Over Apps, Default Assistant, Accessibility).
-          - 🚗 **Driving Mode & Caller Announcer**: Speaks caller name aloud over ringtone. Say "Uthao" to answer on speakerphone!
-          - 💊 **Persistent Dawai Doctor & Health Reminders**: Continuous voice reminders until you say "Pee li".
-          - 🌐 **Free Web Intelligence & Offline Commands**: Instant weather and facts without consuming AI tokens.
-          - 🔒 **100% On-Device Local SQLite Privacy**: All memories, schedules, and notes stay strictly on your phone.
+          ### 🚀 What's New in v3.2.0:
+          - 🫧 **Realme, Oppo & OnePlus Bulletproof Siri Pop-Up**: Bypasses ColorOS background overlay blocking using a Translucent Compose Window (`Theme.AayaAssistant.Translucent`) with its own foreground window token. Renders 100% reliably over WhatsApp, YouTube, Games, and Home Screen!
+          - 🎨 **Futuristic Siri Dancing Soundwave & Aurora Border**: 5 dynamic dancing audio waveform bars reacting in real-time to your voice volume, surrounded by a shimmering Neon Cyan, Electric Violet, and Hot Magenta rotating aura.
+          - 🔇 **Zero Mic Flicker & 0% Idle Battery Drain**: Background passive speech loop permanently eliminated. Phone microphone NEVER turns ON/OFF/ON/OFF in the background. Mic activates ONLY when summoned!
+          - ⏱️ **Strict 5-Second Silence Sleep Timer**: Summon AAYA via Power-Button hold (0.5s) or assist gesture. If you don't speak within 5 seconds, AAYA smoothly closes the pop-up and sleeps silently (zero error tone, zero loops).
+          - ⚡ **Single-Shot Voice Command Execution**: Speaks your command ("Hello", "Call Mom", "Torch on", "Take screenshot", etc.). Mic shuts OFF immediately, command runs in background, speaks response, and dismisses cleanly.
+          - 🌅 **Dynamic Morning & Weather Briefings**: Proactive morning wake-up with live weather reports, evening wind-down, and 20+ non-repetitive caring hydration alerts addressing user by name.
+          - 🛡️ **All 20+ Core Features 100% Intact**: Hands-free calling on speaker, auto SMS, geofencing, driving mode caller announcer, app usage police, Dawai doctor, camera timers, voice screenshots, and Gemini AI intelligence.
           EOF
 
-          gh release delete v3.1.0 --yes || true
-          gh release create v3.1.0 \
+          gh release delete v3.2.0 --yes || true
+          gh release create v3.2.0 \
             app/build/outputs/apk/debug/app-debug.apk \
             AAYA-Assistant.zip \
-            --title "AAYA AI Assistant v3.1.0 APK (Power-Button System Upgrade)" \
+            --title "AAYA AI Assistant v3.2.0 APK (Siri Animated Pop-up & Zero Mic Flicker)" \
             --notes-file release_notes.md

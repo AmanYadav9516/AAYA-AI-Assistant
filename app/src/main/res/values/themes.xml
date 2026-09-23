@@ -5,4 +5,13 @@
         <item name="android:navigationBarColor">#0A0B1E</item>
         <item name="android:windowBackground">#0A0B1E</item>
     </style>
+
+    <style name="Theme.AayaAssistant.Translucent" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Translucent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
 </resources>

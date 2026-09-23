@@ -92,9 +92,9 @@
         <!-- Translucent Voice Trigger Activity for Power-Button Hold & Assist Intent -->
         <activity
             android:name=".ui.trigger.VoiceTriggerActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:theme="@style/Theme.AayaAssistant.Translucent"
             android:excludeFromRecents="true"
-            android:launchMode="singleTask"
+            android:launchMode="singleTop"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.ASSIST" />

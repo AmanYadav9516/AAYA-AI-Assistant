@@ -7,7 +7,12 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.aaya.assistant.AayaApplication
+import com.aaya.assistant.engine.web.WebIntelligenceEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Calendar
+import kotlin.random.Random
 
 class HydrationReceiver : BroadcastReceiver() {
 
@@ -18,24 +23,62 @@ class HydrationReceiver : BroadcastReceiver() {
         val userName = prefs.userName.ifBlank { "there" }
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
 
-        // Only remind during active waking hours (8 AM to 10 PM)
-        if (hour in 8..22) {
-            val isRestTime = hour % 4 == 0
-            if (isRestTime) {
-                AayaApplication.instance.showSystemNotification(
-                    title = "🧘 Time for a Rest, $userName",
-                    message = "Hey $userName, you've been working hard! Take a 2-minute break, stretch, and relax your eyes."
-                )
-            } else {
-                AayaApplication.instance.showSystemNotification(
-                    title = "💧 Drink Water, $userName",
-                    message = "Hey $userName, don't forget to drink a glass of water! Staying hydrated keeps your brain sharp."
-                )
+        // Asynchronous processing using goAsync()
+        val pendingResult = goAsync()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                when (hour) {
+                    in 6..9 -> {
+                        // Morning Briefing & Weather Wakeup
+                        val weatherSummary = WebIntelligenceEngine.getInstantAnswer("weather") ?: ""
+                        val weatherText = if (weatherSummary.isNotBlank()) " $weatherSummary" else ""
+                        AayaApplication.instance.showSystemNotification(
+                            title = "🌅 Good Morning, $userName!",
+                            message = "A fresh day begins!$weatherText Start your morning with a warm glass of water to energize your mind."
+                        )
+                    }
+                    in 20..22 -> {
+                        // Evening Wind-Down
+                        AayaApplication.instance.showSystemNotification(
+                            title = "🌙 Good Evening, $userName",
+                            message = "You did great today! Take a deep breath, drink some water, and relax your eyes away from bright screens."
+                        )
+                    }
+                    in 10..19 -> {
+                        // Dynamic Non-Repetitive Daytime Caring Prompts
+                        val (title, message) = getRandomHydrationPrompt(userName)
+                        AayaApplication.instance.showSystemNotification(
+                            title = title,
+                            message = message
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore failure
+            } finally {
+                pendingResult.finish()
             }
         }
 
         // Schedule next reminder in 2 hours
         scheduleNext(context)
+    }
+
+    private fun getRandomHydrationPrompt(userName: String): Pair<String, String> {
+        val prompts = listOf(
+            "💧 Hydro Check, $userName!" to "Paani ka ek glass pee lo! Staying hydrated improves focus and keeps your energy high.",
+            "🧠 Brain Boost Time, $userName" to "Even mild dehydration drops productivity. Grab your water bottle and take a refreshing sip!",
+            "✨ Quick Sip Reminder, $userName" to "Kaam ke beech me paani peena mat bhoolna. Ek glass paani aur 30 second ki walk ho jaye!",
+            "🥤 Stay Fresh, $userName!" to "Water break! Your body and mind will thank you. Sip a little water right now.",
+            "🌟 Wellness Alert, $userName" to "Health is priority #1! Ek ghoont paani aur lambi saans lo. You're doing amazing.",
+            "💧 Hydration Check, $userName" to "It's been a while since your last glass of water. Keep your hydration streak going!",
+            "🧘 2-Minute Rest & Sip" to "Screen se thodi der nazar hataiye, stretch kijiye aur paani pijiye $userName!",
+            "🌊 Refresh Yourself, $userName" to "Your brain is 75% water. Fuel it up with a fresh drink right now.",
+            "⚡ Recharge Station" to "Energy dipping? Sometimes all you need is a cool glass of water. Drink up, $userName!",
+            "💙 Care from AAYA" to "AAYA cares for your health $userName. Please drink a glass of water right away."
+        )
+        return prompts[Random.nextInt(prompts.size)]
     }
 
     companion object {

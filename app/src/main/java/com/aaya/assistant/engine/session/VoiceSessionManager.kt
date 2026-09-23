@@ -17,12 +17,11 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
-import com.aaya.assistant.AayaApplication
 import com.aaya.assistant.data.local.PreferenceManager
 import com.aaya.assistant.engine.audio.TextToSpeechManager
 import com.aaya.assistant.engine.audio.TtsCallback
-import com.aaya.assistant.engine.overlay.FloatingOverlayManager
 import com.aaya.assistant.engine.router.CommandRouter
+import com.aaya.assistant.ui.trigger.VoiceTriggerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,16 +32,16 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 enum class VoiceState {
-    SLEEPING,           // Standby / passive wake-word monitoring
-    WAKE_DETECTED,      // Wake triggered (Haptic pulse + Audio ducking)
-    LISTENING_COMMAND,  // Active command recognition session
+    SLEEPING,           // Standby / Microphone strictly OFF
+    WAKE_DETECTED,      // Wake triggered (Haptic pulse + Launching Translucent Overlay)
+    LISTENING_COMMAND,  // Active single-shot command recognition session (5s silence timer)
     PROCESSING,         // Parsing intent and routing
-    EXECUTING,          // Performing phone action (Call, SMS, Alarm, Camera)
+    EXECUTING,          // Performing phone action (Call, SMS, Alarm, Camera, etc.)
     SPEAKING            // AAYA TTS speaking (Microphone strictly OFF)
 }
 
 enum class TriggerSource {
-    VOICE_WAKE,         // "Hey AAYA", "AAYA Suno"
+    VOICE_WAKE,         // System Assist / Power-Button Hold
     VOLUME_KEYS,        // Volume Up + Down pressed together
     QUICK_SETTINGS,     // Quick Settings Notification Shade Tile
     NOTIFICATION_ACTION,// "Ask AAYA" notification button
@@ -60,21 +59,37 @@ class VoiceSessionManager(
 
     companion object {
         private const val TAG = "AAYA_VOICE"
+        private const val SILENCE_TIMEOUT_SECONDS = 5
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private val overlayManager = FloatingOverlayManager(context)
 
+    // State Flows observed by VoiceTriggerActivity (Siri Floating Overlay) & In-App UI
     private val _voiceState = MutableStateFlow(VoiceState.SLEEPING)
     val voiceState: StateFlow<VoiceState> = _voiceState.asStateFlow()
 
+    private val _streamingTranscript = MutableStateFlow("")
+    val streamingTranscript: StateFlow<String> = _streamingTranscript.asStateFlow()
+
+    private val _responseText = MutableStateFlow("")
+    val responseText: StateFlow<String> = _responseText.asStateFlow()
+
+    private val _actionSummary = MutableStateFlow<String?>(null)
+    val actionSummary: StateFlow<String?> = _actionSummary.asStateFlow()
+
+    private val _audioLevelRms = MutableStateFlow(0f)
+    val audioLevelRms: StateFlow<Float> = _audioLevelRms.asStateFlow()
+
+    private val _silenceCountdown = MutableStateFlow(SILENCE_TIMEOUT_SECONDS)
+    val silenceCountdown: StateFlow<Int> = _silenceCountdown.asStateFlow()
+
     private var speechRecognizer: SpeechRecognizer? = null
     private var audioFocusRequest: AudioFocusRequest? = null
-    private var commandRetryCount = 0
-    private var shouldListenAfterSpeech = false
+    private var silenceTimerRunnable: Runnable? = null
+    private var hasSpeechStarted = false
 
     init {
         ttsManager.addCallback(this)
@@ -90,74 +105,48 @@ class VoiceSessionManager(
 
     /**
      * Unified entry-point for ALL activation methods:
-     * Voice, Hardware Volume Keys, Quick Settings Tile, Notification Action, Bluetooth earphone, Shake.
+     * Power button hold, Volume Keys, Quick Settings Tile, Notification Action, Shake gesture, In-App.
+     * Launches the Siri Translucent Overlay Activity which hosts the floating UI directly.
      */
-    fun wakeAaya(source: TriggerSource) {
+    fun wakeAaya(source: TriggerSource = TriggerSource.VOICE_WAKE) {
         Log.d(TAG, "wakeAaya triggered by source=$source in state=${_voiceState.value}")
 
         // 1. Immediate Haptic Pulse
         triggerHapticPulse()
 
+        // 2. Launch Translucent VoiceTriggerActivity (guaranteed foreground Window Token)
+        val triggerIntent = Intent(context, VoiceTriggerActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("TRIGGER_SOURCE", source.name)
+        }
+        context.startActivity(triggerIntent)
+    }
+
+    /**
+     * Called by VoiceTriggerActivity.onCreate() or in-app mic button to start active command listening.
+     * Single-shot execution with strict 5-second silence sleep timer.
+     */
+    fun startVoiceSession() {
+        Log.d(TAG, "startVoiceSession() initiated")
+
+        // 1. Reset states
+        _streamingTranscript.value = ""
+        _responseText.value = ""
+        _actionSummary.value = null
+        _audioLevelRms.value = 0f
+        _silenceCountdown.value = SILENCE_TIMEOUT_SECONDS
+        hasSpeechStarted = false
+
         // 2. Request Audio Ducking (drop background music/video volume)
         requestAudioDucking()
 
-        // 3. Update State
-        setState(VoiceState.WAKE_DETECTED)
-
-        // 4. Show Floating Neon Pill Overlay
-        val userName = prefs.userName.ifBlank { "there" }
-        overlayManager.show("Hello $userName, I'm listening...")
-
-        // 5. If triggered manually (buttons, tile, notification), start command listening immediately
-        if (source != TriggerSource.VOICE_WAKE) {
-            startCommandListening()
-        }
-    }
-
-    /**
-     * Starts passive wake-word monitoring (Only when screen is ON and wake word enabled).
-     */
-    fun startPassiveWakeMonitoring() {
-        if (_voiceState.value != VoiceState.SLEEPING) return
-        if (!powerManager.isInteractive || !prefs.isWakeWordEnabled) return
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) return
-
-        mainHandler.post {
-            try {
-                destroyRecognizer()
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                    setRecognitionListener(createPassiveWakeListener())
-                }
-
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-                }
-                speechRecognizer?.startListening(intent)
-                Log.d(TAG, "Passive wake listener started")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to start passive wake listener", e)
-                schedulePassiveWakeRestart(3000)
-            }
-        }
-    }
-
-    /**
-     * Stops passive wake monitoring (e.g. when screen turns OFF or when active).
-     */
-    fun stopPassiveWakeMonitoring() {
-        if (_voiceState.value == VoiceState.SLEEPING) {
-            destroyRecognizer()
-            Log.d(TAG, "Passive wake listener stopped")
-        }
-    }
-
-    private fun startCommandListening() {
+        // 3. Set state to LISTENING_COMMAND
         setState(VoiceState.LISTENING_COMMAND)
-        commandRetryCount = 0
 
+        // 4. Start strict 5-Second Silence Countdown
+        startSilenceCountdown()
+
+        // 5. Initialize SpeechRecognizer on Main Thread
         mainHandler.post {
             try {
                 destroyRecognizer()
@@ -170,131 +159,104 @@ class VoiceSessionManager(
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                    // Generous silence threshold to avoid premature cutoffs
-                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 3000L)
-                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
-                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+                    putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2500L)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
                 }
 
                 speechRecognizer?.startListening(intent)
-                overlayManager.updateText("Listening for your command...")
-                Log.d(TAG, "Command recognizer started")
+                Log.d(TAG, "Command recognizer listening started with 5s silence timeout")
             } catch (e: Exception) {
-                Log.e(TAG, "Error starting command recognizer", e)
+                Log.e(TAG, "Failed to start command speech recognizer", e)
                 returnToSleep()
             }
         }
     }
 
-    private fun createPassiveWakeListener() = object : RecognitionListener {
-        override fun onReadyForSpeech(params: Bundle?) {}
-        override fun onBeginningOfSpeech() {}
-        override fun onRmsChanged(rmsdB: Float) {}
-        override fun onBufferReceived(buffer: ByteArray?) {}
-        override fun onEndOfSpeech() {}
+    private fun startSilenceCountdown() {
+        cancelSilenceCountdown()
+        var remainingSeconds = SILENCE_TIMEOUT_SECONDS
 
-        override fun onError(error: Int) {
-            // DO NOT flicker mic rapidly. Restart only with moderate delay when still sleeping
-            if (_voiceState.value == VoiceState.SLEEPING && powerManager.isInteractive && prefs.isWakeWordEnabled) {
-                schedulePassiveWakeRestart(2000)
+        silenceTimerRunnable = object : Runnable {
+            override fun run() {
+                remainingSeconds--
+                _silenceCountdown.value = remainingSeconds
+                if (remainingSeconds <= 0) {
+                    Log.d(TAG, "5-Second silence timeout reached. User did not speak -> Going back to sleep cleanly.")
+                    returnToSleep()
+                } else {
+                    mainHandler.postDelayed(this, 1000)
+                }
             }
         }
-
-        override fun onResults(results: Bundle?) {
-            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: arrayListOf()
-            handlePassiveResults(matches)
-        }
-
-        override fun onPartialResults(partialResults: Bundle?) {
-            // Log partials, but NEVER call stopListening() here to preserve full sentence!
-            val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: arrayListOf()
-            val text = matches.firstOrNull() ?: ""
-            if (isWakeWordMatch(text)) {
-                Log.d(TAG, "Partial wake detected: \"$text\" (Waiting for full utterance...)")
-            }
-        }
-
-        override fun onEvent(eventType: Int, params: Bundle?) {}
+        mainHandler.postDelayed(silenceTimerRunnable!!, 1000)
     }
 
-    private fun handlePassiveResults(matches: List<String>) {
-        if (matches.isEmpty()) {
-            if (_voiceState.value == VoiceState.SLEEPING && powerManager.isInteractive && prefs.isWakeWordEnabled) {
-                schedulePassiveWakeRestart(1500)
-            }
-            return
-        }
-
-        val fullSpoken = matches.firstOrNull()?.trim() ?: ""
-        Log.d(TAG, "Passive speech received: \"$fullSpoken\"")
-
-        if (isWakeWordMatch(fullSpoken)) {
-            // Check for Option A: Single-Breath Utterance ("Hey AAYA make a call to mom")
-            val strippedCommand = stripWakeWord(fullSpoken)
-
-            if (strippedCommand.length > 2) {
-                // Option A: Command was spoken in the same breath!
-                Log.d(TAG, "Option A (Single-Breath) matched: \"$strippedCommand\"")
-                wakeAaya(TriggerSource.VOICE_WAKE)
-                processCommand(strippedCommand)
-            } else {
-                // Option B: User only said "Hey AAYA" and stopped -> Greet & listen for follow-up
-                Log.d(TAG, "Option B (Two-Stage) matched: Wake only")
-                wakeAaya(TriggerSource.VOICE_WAKE)
-                speakGreetingAndPrompt()
-            }
-        } else {
-            if (_voiceState.value == VoiceState.SLEEPING && powerManager.isInteractive && prefs.isWakeWordEnabled) {
-                schedulePassiveWakeRestart(1200)
-            }
-        }
+    private fun cancelSilenceCountdown() {
+        silenceTimerRunnable?.let { mainHandler.removeCallbacks(it) }
+        silenceTimerRunnable = null
     }
 
     private fun createCommandListener() = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
-            overlayManager.updateText("Listening...")
+            Log.d(TAG, "Microphone ready for speech input")
         }
-        override fun onBeginningOfSpeech() {}
-        override fun onRmsChanged(rmsdB: Float) {}
+
+        override fun onBeginningOfSpeech() {
+            Log.d(TAG, "Speech detected: Cancelling 5s silence countdown")
+            hasSpeechStarted = true
+            cancelSilenceCountdown()
+        }
+
+        override fun onRmsChanged(rmsdB: Float) {
+            _audioLevelRms.value = rmsdB
+            // If user produces significant audio amplitude, ensure silence countdown is cancelled
+            if (rmsdB > 2.5f && !hasSpeechStarted) {
+                hasSpeechStarted = true
+                cancelSilenceCountdown()
+            }
+        }
+
         override fun onBufferReceived(buffer: ByteArray?) {}
-        override fun onEndOfSpeech() {}
+
+        override fun onEndOfSpeech() {
+            Log.d(TAG, "Speech ended. Waiting for final results...")
+            cancelSilenceCountdown()
+        }
 
         override fun onError(error: Int) {
             Log.w(TAG, "Command recognition error code=$error")
+            cancelSilenceCountdown()
+            // Single-shot: Never restart or loop microphone on error. Smoothly go to sleep!
             if (_voiceState.value == VoiceState.LISTENING_COMMAND) {
-                if (commandRetryCount < 1) {
-                    commandRetryCount++
-                    overlayManager.updateText("Boliye, sun rahi hoon...")
-                    mainHandler.postDelayed({
-                        if (_voiceState.value == VoiceState.LISTENING_COMMAND) {
-                            startCommandListening()
-                        }
-                    }, 500)
-                } else {
-                    val name = prefs.userName.ifBlank { "there" }
-                    overlayManager.updateText("Koi aawaz nahi aayi $name. Standby mode.")
-                    returnToSleep()
-                }
+                returnToSleep()
             }
         }
 
         override fun onResults(results: Bundle?) {
-            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: arrayListOf()
-            val command = matches.firstOrNull()?.trim() ?: ""
-            Log.d(TAG, "Command recognized: \"$command\"")
+            cancelSilenceCountdown()
+            // Turn OFF microphone immediately! Zero background mic usage!
+            destroyRecognizer()
 
-            if (command.isNotEmpty()) {
-                val cleaned = stripWakeWord(command)
-                processCommand(if (cleaned.length > 1) cleaned else command)
+            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: arrayListOf()
+            val rawCommand = matches.firstOrNull()?.trim() ?: ""
+            Log.d(TAG, "Final command recognized: \"$rawCommand\"")
+
+            if (rawCommand.isNotEmpty()) {
+                val cleaned = stripWakeWord(rawCommand)
+                val finalCommand = if (cleaned.length > 1) cleaned else rawCommand
+                processCommand(finalCommand)
             } else {
                 returnToSleep()
             }
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
+            cancelSilenceCountdown()
             val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
             if (!partial.isNullOrEmpty()) {
-                overlayManager.updateText(partial)
+                _streamingTranscript.value = partial
             }
         }
 
@@ -303,40 +265,34 @@ class VoiceSessionManager(
 
     private fun processCommand(command: String) {
         setState(VoiceState.PROCESSING)
-        overlayManager.updateText("Working: \"$command\"...")
+        _streamingTranscript.value = "\"$command\""
 
         scope.launch {
             try {
                 setState(VoiceState.EXECUTING)
                 val result = commandRouter.routeCommand(command)
-                val summary = result.actionSummary
-                val speech = result.speechResponse
-                val displayText = if (!summary.isNullOrEmpty()) summary else speech
-                overlayManager.updateText(displayText)
+                _actionSummary.value = result.actionSummary
+                _responseText.value = result.speechResponse
 
                 // Speak response if available
-                if (speech.isNotBlank()) {
-                    speakResponse(speech, shouldFollowUp = false)
+                if (result.speechResponse.isNotBlank()) {
+                    speakResponse(result.speechResponse)
                 } else {
-                    mainHandler.postDelayed({ returnToSleep() }, 3000)
+                    // Action executed without speech (e.g. Flashlight toggled, Screenshot taken)
+                    // Keep result visible for 2.2s then return to sleep
+                    mainHandler.postDelayed({ returnToSleep() }, 2200)
                 }
             } catch (e: Exception) {
-                overlayManager.updateText("Error: ${e.localizedMessage}")
-                mainHandler.postDelayed({ returnToSleep() }, 3000)
+                Log.e(TAG, "Error executing command: $command", e)
+                _responseText.value = "Error: ${e.localizedMessage}"
+                mainHandler.postDelayed({ returnToSleep() }, 2500)
             }
         }
     }
 
-    private fun speakGreetingAndPrompt() {
-        val userName = prefs.userName.ifBlank { "there" }
-        val greeting = "Hello $userName, I am here! How can I help you?"
-        speakResponse(greeting, shouldFollowUp = true)
-    }
-
-    private fun speakResponse(text: String, shouldFollowUp: Boolean) {
+    private fun speakResponse(text: String) {
         setState(VoiceState.SPEAKING)
-        shouldListenAfterSpeech = shouldFollowUp
-        destroyRecognizer() // Strictly mute mic while AAYA is speaking
+        destroyRecognizer() // Microphone is strictly OFF while speaking
         ttsManager.speak(text)
     }
 
@@ -347,42 +303,29 @@ class VoiceSessionManager(
     }
 
     override fun onSpeechFinished() {
-        Log.d(TAG, "TTS speech finished. shouldFollowUp=$shouldListenAfterSpeech")
-        mainHandler.post {
-            if (shouldListenAfterSpeech) {
-                shouldListenAfterSpeech = false
-                startCommandListening()
-            } else {
-                mainHandler.postDelayed({ returnToSleep() }, 2000)
-            }
-        }
+        Log.d(TAG, "TTS speech finished. Smoothly closing overlay and going to sleep.")
+        mainHandler.postDelayed({
+            returnToSleep()
+        }, 1200)
     }
 
     override fun onSpeechError(error: String) {
         Log.e(TAG, "TTS speech error: $error")
-        mainHandler.post { returnToSleep() }
+        mainHandler.postDelayed({
+            returnToSleep()
+        }, 1000)
     }
 
+    /**
+     * Completely shuts off microphone, abandons audio ducking, cancels all timers,
+     * and sets state to SLEEPING. 0% battery consumption.
+     */
     fun returnToSleep() {
-        Log.d(TAG, "Returning to SLEEPING state")
-        setState(VoiceState.SLEEPING)
+        Log.d(TAG, "returnToSleep() executed. Standby mode active.")
+        cancelSilenceCountdown()
         destroyRecognizer()
         abandonAudioDucking()
-        overlayManager.hide()
-
-        // Resume passive listening if screen is active
-        if (powerManager.isInteractive && prefs.isWakeWordEnabled) {
-            schedulePassiveWakeRestart(1000)
-        }
-    }
-
-    private fun schedulePassiveWakeRestart(delayMs: Long) {
-        mainHandler.removeCallbacksAndMessages(null)
-        mainHandler.postDelayed({
-            if (_voiceState.value == VoiceState.SLEEPING && powerManager.isInteractive && prefs.isWakeWordEnabled) {
-                startPassiveWakeMonitoring()
-            }
-        }, delayMs)
+        setState(VoiceState.SLEEPING)
     }
 
     private fun destroyRecognizer() {
@@ -391,30 +334,34 @@ class VoiceSessionManager(
             speechRecognizer?.cancel()
             speechRecognizer?.destroy()
         } catch (e: Exception) {
-            // Ignore cleanup
+            // Ignore cleanup errors
         } finally {
             speechRecognizer = null
         }
     }
 
     private fun requestAudioDucking() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build()
-            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                .setAudioAttributes(audioAttributes)
-                .setAcceptsDelayedFocusGain(true)
-                .build()
-            audioFocusRequest?.let { audioManager.requestAudioFocus(it) }
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                null,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-            )
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+                audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                    .setAudioAttributes(audioAttributes)
+                    .setAcceptsDelayedFocusGain(true)
+                    .build()
+                audioFocusRequest?.let { audioManager.requestAudioFocus(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(
+                    null,
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+                )
+            }
+        } catch (e: Exception) {
+            // Ignore audio focus error
         }
     }
 
@@ -436,28 +383,21 @@ class VoiceSessionManager(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vibratorManager?.defaultVibrator?.vibrate(
-                    VibrationEffect.createOneShot(25, VibrationEffect.DEFAULT_AMPLITUDE)
+                    VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE)
                 )
             } else {
                 @Suppress("DEPRECATION")
                 val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator?.vibrate(VibrationEffect.createOneShot(25, VibrationEffect.DEFAULT_AMPLITUDE))
+                    vibrator?.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
                 } else {
                     @Suppress("DEPRECATION")
-                    vibrator?.vibrate(25)
+                    vibrator?.vibrate(30)
                 }
             }
         } catch (e: Exception) {
             // Ignore haptic failure
         }
-    }
-
-    private fun isWakeWordMatch(text: String): Boolean {
-        val lower = text.lowercase(Locale.ROOT).trim()
-        return lower.contains("hey aaya") || lower.contains("aaya suno") ||
-                lower.contains("suno aaya") || lower.contains("ok aaya") ||
-                lower == "aaya" || lower.startsWith("aaya ") || lower.endsWith(" aaya")
     }
 
     private fun stripWakeWord(text: String): String {

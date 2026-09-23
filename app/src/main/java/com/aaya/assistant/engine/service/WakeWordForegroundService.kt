@@ -5,56 +5,22 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.aaya.assistant.AayaApplication
 import com.aaya.assistant.engine.session.TriggerSource
 import com.aaya.assistant.ui.MainActivity
+import com.aaya.assistant.ui.trigger.VoiceTriggerActivity
 
 class WakeWordForegroundService : Service() {
-
-    private val screenStateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val app = application as? AayaApplication ?: return
-            when (intent?.action) {
-                Intent.ACTION_SCREEN_ON -> {
-                    if (app.preferenceManager.isWakeWordEnabled) {
-                        app.voiceSessionManager.startPassiveWakeMonitoring()
-                    }
-                }
-                Intent.ACTION_SCREEN_OFF -> {
-                    app.voiceSessionManager.stopPassiveWakeMonitoring()
-                }
-                ACTION_WAKE_AAYA -> {
-                    app.voiceSessionManager.wakeAaya(TriggerSource.NOTIFICATION_ACTION)
-                }
-            }
-        }
-    }
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
-
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_SCREEN_ON)
-            addAction(Intent.ACTION_SCREEN_OFF)
-            addAction(ACTION_WAKE_AAYA)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(screenStateReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(screenStateReceiver, filter)
-        }
-
-        val app = application as AayaApplication
-        app.voiceSessionManager.startPassiveWakeMonitoring()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -78,7 +44,7 @@ class WakeWordForegroundService : Service() {
                 "AAYA Voice Companion Standby",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps AAYA voice companion listening for Hey AAYA while screen is on"
+                description = "Keeps AAYA voice companion ready for instant summon"
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
@@ -95,23 +61,23 @@ class WakeWordForegroundService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // Action 1: Instant "🎙️ Ask AAYA" Button
-        val wakeIntent = Intent(ACTION_WAKE_AAYA).apply {
-            setPackage(packageName)
+        // Action 1: Instant "🎙️ Ask AAYA" Button -> Opens VoiceTriggerActivity directly
+        val triggerIntent = Intent(this, VoiceTriggerActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
-        val wakePending = PendingIntent.getBroadcast(
+        val triggerPending = PendingIntent.getActivity(
             this,
             1001,
-            wakeIntent,
+            triggerIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("AAYA Voice Companion Active")
-            .setContentText("Say \"Hey AAYA\" or tap below to speak")
+            .setContentTitle("AAYA Assistant Ready")
+            .setContentText("Long-press Power button or tap below to speak")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pendingOpen)
-            .addAction(android.R.drawable.ic_btn_speak_now, "🎙️ Ask AAYA", wakePending)
+            .addAction(android.R.drawable.ic_btn_speak_now, "🎙️ Ask AAYA", triggerPending)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
@@ -119,11 +85,6 @@ class WakeWordForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            unregisterReceiver(screenStateReceiver)
-        } catch (e: Exception) {
-            // Ignore unregister
-        }
         val app = application as? AayaApplication
         app?.voiceSessionManager?.returnToSleep()
     }
