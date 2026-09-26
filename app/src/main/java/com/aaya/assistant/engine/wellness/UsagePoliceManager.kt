@@ -30,6 +30,60 @@ class UsagePoliceManager(private val context: Context) {
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
+    fun getTodayUsageSummary(): String {
+        if (!hasUsagePermission()) {
+            return "Please allow Usage Access in Settings so I can track your screen time."
+        }
+
+        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+        }
+        val startTime = calendar.timeInMillis
+        val endTime = System.currentTimeMillis()
+
+        val stats = usageStatsManager.queryUsageStats(
+            UsageStatsManager.INTERVAL_DAILY,
+            startTime,
+            endTime
+        ) ?: return "Today's usage statistics are currently unavailable."
+
+        val pm = context.packageManager
+        val appUsageList = mutableListOf<Pair<String, Long>>()
+        var totalMs = 0L
+
+        for (usage in stats) {
+            if (usage.totalTimeInForeground > 60_000L) { // at least 1 minute
+                val appName = try {
+                    val appInfo = pm.getApplicationInfo(usage.packageName, 0)
+                    pm.getApplicationLabel(appInfo).toString()
+                } catch (e: Exception) {
+                    usage.packageName.substringAfterLast('.')
+                }
+                appUsageList.add(appName to usage.totalTimeInForeground)
+                totalMs += usage.totalTimeInForeground
+            }
+        }
+
+        if (totalMs == 0L) {
+            return "You have barely used your phone today (less than 1 minute)."
+        }
+
+        val totalHours = totalMs / (1000 * 60 * 60)
+        val totalMinutes = (totalMs / (1000 * 60)) % 60
+        val topApps = appUsageList.sortedByDescending { it.second }.take(3)
+
+        val topBreakdown = topApps.joinToString(", ") { (name, ms) ->
+            val m = ms / 60000
+            if (m >= 60) "${m / 60}h ${m % 60}m $name" else "$m min $name"
+        }
+
+        val totalStr = if (totalHours > 0) "$totalHours ghante $totalMinutes minute" else "$totalMinutes minute"
+        return "Aaj aapka total screen time $totalStr hai. Sabse zyada: $topBreakdown."
+    }
+
     fun checkAndEnforceAppLimits() {
         if (!hasUsagePermission()) return
 

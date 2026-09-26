@@ -1,20 +1,40 @@
 package com.aaya.assistant.engine.router
 
+import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraManager
+import android.location.Geocoder
+import android.location.Location
+import android.location.LocationManager
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.provider.AlarmClock
+import android.provider.MediaStore
+import android.provider.Settings
+import androidx.core.content.ContextCompat
+import java.util.Locale
+
+data class LiveLocationInfo(
+    val pinCode: String,
+    val city: String,
+    val district: String,
+    val state: String,
+    val country: String,
+    val area: String,
+    val latitude: Double,
+    val longitude: Double
+)
 
 class DeviceController(private val context: Context) {
 
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
     fun toggleFlashlight(enable: Boolean): Boolean {
         return try {
@@ -45,15 +65,17 @@ class DeviceController(private val context: Context) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(launchIntent)
                 true
-            } else false
+            } else {
+                false
+            }
         } else {
             false
         }
     }
 
-    fun openSettings(): Boolean {
+    fun openAppSettings(): Boolean {
         return try {
-            val intent = Intent(android.provider.Settings.ACTION_SETTINGS).apply {
+            val intent = Intent(Settings.ACTION_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -65,7 +87,7 @@ class DeviceController(private val context: Context) {
 
     fun openWifiSettings(): Boolean {
         return try {
-            val intent = Intent(android.provider.Settings.ACTION_WIFI_SETTINGS).apply {
+            val intent = Intent(Settings.ACTION_WIFI_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -77,7 +99,19 @@ class DeviceController(private val context: Context) {
 
     fun openBluetoothSettings(): Boolean {
         return try {
-            val intent = Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+            val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun openDisplaySettings(): Boolean {
+        return try {
+            val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -96,7 +130,6 @@ class DeviceController(private val context: Context) {
             context.startActivity(callIntent)
             true
         } catch (e: SecurityException) {
-            // Fallback to dialer if CALL_PHONE permission not granted
             val dialIntent = Intent(Intent.ACTION_DIAL).apply {
                 data = Uri.parse("tel:${phoneNumber.trim()}")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -142,31 +175,249 @@ class DeviceController(private val context: Context) {
         }
     }
 
+    // Volume Controls
     fun adjustVolume(increase: Boolean) {
         val direction = if (increase) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
-        audioManager.adjustStreamVolume(AudioManager.STREAM_RING, direction, AudioManager.FLAG_SHOW_UI)
         audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
+        try {
+            audioManager.adjustStreamVolume(AudioManager.STREAM_RING, direction, 0)
+        } catch (e: Exception) {
+            // Ignore ringer volume restriction if DND is active
+        }
+    }
+
+    fun setVolumePercent(percent: Int) {
+        val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val target = ((percent.coerceIn(0, 100) / 100f) * maxMusic).toInt()
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, AudioManager.FLAG_SHOW_UI)
+    }
+
+    fun muteVolume() {
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, AudioManager.FLAG_SHOW_UI)
+    }
+
+    // Screen Brightness Controls
+    fun hasWriteSettingsPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.System.canWrite(context)
+        } else true
+    }
+
+    fun requestWriteSettingsPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                val intent = Intent(Settings.ACTION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            }
+        }
+    }
+
+    fun setBrightness(percent: Int): Boolean {
+        if (!hasWriteSettingsPermission()) {
+            requestWriteSettingsPermission()
+            return false
+        }
+        return try {
+            val brightnessVal = ((percent.coerceIn(5, 100) / 100f) * 255).toInt().coerceIn(10, 255)
+            Settings.System.putInt(
+                context.contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS_MODE,
+                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+            )
+            Settings.System.putInt(
+                context.contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS,
+                brightnessVal
+            )
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun adjustBrightness(increase: Boolean): Boolean {
+        if (!hasWriteSettingsPermission()) {
+            requestWriteSettingsPermission()
+            return false
+        }
+        return try {
+            val current = Settings.System.getInt(
+                context.contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS,
+                128
+            )
+            val delta = if (increase) 50 else -50
+            val target = (current + delta).coerceIn(15, 255)
+            Settings.System.putInt(
+                context.contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS_MODE,
+                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+            )
+            Settings.System.putInt(
+                context.contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS,
+                target
+            )
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // Music Player: Local Library vs Streaming
+    fun launchLocalMusicPlayer(): Boolean {
+        return try {
+            val intent = Intent(MediaStore.INTENT_ACTION_MUSIC_PLAYER).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            try {
+                val intent = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MUSIC).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                true
+            } catch (ex: Exception) {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(Uri.EMPTY, "audio/*")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                    true
+                } catch (e3: Exception) {
+                    false
+                }
+            }
+        }
+    }
+
+    // Live Location & Reverse Geocoding
+    fun hasLocationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun getLiveLocationDetails(): LiveLocationInfo? {
+        if (!hasLocationPermission()) return null
+
+        val lastLoc = try {
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                ?: locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+        } catch (e: SecurityException) {
+            null
+        } ?: return null
+
+        return try {
+            val geocoder = Geocoder(context, Locale.getDefault())
+            @Suppress("DEPRECATION")
+            val addresses = geocoder.getFromLocation(lastLoc.latitude, lastLoc.longitude, 1)
+            val addr = addresses?.firstOrNull()
+
+            LiveLocationInfo(
+                pinCode = addr?.postalCode ?: "",
+                city = addr?.locality ?: addr?.subAdminArea ?: "",
+                district = addr?.subAdminArea ?: addr?.locality ?: "",
+                state = addr?.adminArea ?: "",
+                country = addr?.countryName ?: "India",
+                area = addr?.featureName ?: addr?.subLocality ?: "",
+                latitude = lastLoc.latitude,
+                longitude = lastLoc.longitude
+            )
+        } catch (e: Exception) {
+            LiveLocationInfo(
+                pinCode = "",
+                city = "",
+                district = "",
+                state = "",
+                country = "India",
+                area = "",
+                latitude = lastLoc.latitude,
+                longitude = lastLoc.longitude
+            )
+        }
+    }
+
+    fun getDistanceFromJaipur(): Int? {
+        if (!hasLocationPermission()) return null
+
+        val lastLoc = try {
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+        } catch (e: SecurityException) {
+            null
+        } ?: return null
+
+        val results = FloatArray(1)
+        // Jaipur coordinates: 26.9124° N, 75.7873° E
+        Location.distanceBetween(lastLoc.latitude, lastLoc.longitude, 26.9124, 75.7873, results)
+        return (results[0] / 1000f).toInt()
+    }
+
+    fun openNearbySearchInMaps(placeType: String): Boolean {
+        return try {
+            val uri = Uri.parse("geo:0,0?q=${Uri.encode("$placeType near me")}")
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            try {
+                val webUri = Uri.parse("https://www.google.com/maps/search/${Uri.encode("$placeType near me")}")
+                val webIntent = Intent(Intent.ACTION_VIEW, webUri).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(webIntent)
+                true
+            } catch (ex: Exception) {
+                false
+            }
+        }
     }
 
     // Permission Checkers
     fun hasContactPermission(): Boolean {
-        return androidx.core.content.ContextCompat.checkSelfPermission(
+        return ContextCompat.checkSelfPermission(
             context,
-            android.Manifest.permission.READ_CONTACTS
+            Manifest.permission.READ_CONTACTS
         ) == PackageManager.PERMISSION_GRANTED
     }
 
     fun hasPhonePermission(): Boolean {
-        return androidx.core.content.ContextCompat.checkSelfPermission(
+        return ContextCompat.checkSelfPermission(
             context,
-            android.Manifest.permission.CALL_PHONE
+            Manifest.permission.CALL_PHONE
         ) == PackageManager.PERMISSION_GRANTED
     }
 
     fun hasCameraPermission(): Boolean {
-        return androidx.core.content.ContextCompat.checkSelfPermission(
+        return ContextCompat.checkSelfPermission(
             context,
-            android.Manifest.permission.CAMERA
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun hasSmsPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.SEND_SMS
         ) == PackageManager.PERMISSION_GRANTED
     }
 
@@ -178,9 +429,9 @@ class DeviceController(private val context: Context) {
 
     fun hasNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            androidx.core.content.ContextCompat.checkSelfPermission(
+            ContextCompat.checkSelfPermission(
                 context,
-                android.Manifest.permission.POST_NOTIFICATIONS
+                Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else true
     }
@@ -188,27 +439,19 @@ class DeviceController(private val context: Context) {
     // Camera Actions
     fun openCamera(): Boolean {
         return try {
-            val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+            val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
             true
         } catch (e: Exception) {
-            try {
-                val fallbackIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(fallbackIntent)
-                true
-            } catch (ex: Exception) {
-                false
-            }
+            false
         }
     }
 
-    fun takeSelfie(): Boolean {
+    fun openSelfieCamera(): Boolean {
         return try {
-            val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+            val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
                 putExtra("android.intent.extras.CAMERA_FACING", 1)
                 putExtra("android.intent.extra.USE_FRONT_CAMERA", true)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -220,9 +463,9 @@ class DeviceController(private val context: Context) {
         }
     }
 
-    fun recordVideo(): Boolean {
+    fun openVideoCamera(): Boolean {
         return try {
-            val intent = Intent(android.provider.MediaStore.INTENT_ACTION_VIDEO_CAMERA).apply {
+            val intent = Intent(MediaStore.INTENT_ACTION_VIDEO_CAMERA).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -232,165 +475,28 @@ class DeviceController(private val context: Context) {
         }
     }
 
-    // Web Search
-    fun searchWeb(query: String): Boolean {
-        return try {
-            val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
-                putExtra(android.app.SearchManager.QUERY, query)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            true
-        } catch (e: Exception) {
-            openWebUrl("https://www.google.com/search?q=" + Uri.encode(query))
-        }
-    }
-
-    fun openWebUrl(url: String): Boolean {
-        return try {
-            val uri = if (url.startsWith("http://") || url.startsWith("https://")) {
-                Uri.parse(url)
-            } else {
-                Uri.parse("https://$url")
-            }
-            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    // Timers & Alarms
-    fun setTimer(seconds: Int, message: String = "AAYA Timer"): Boolean {
-        return try {
-            val intent = Intent(AlarmClock.ACTION_SET_TIMER).apply {
-                putExtra(AlarmClock.EXTRA_LENGTH, seconds)
-                putExtra(AlarmClock.EXTRA_MESSAGE, message)
-                putExtra(AlarmClock.EXTRA_SKIP_UI, true)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    fun scheduleExactTask(
-        triggerEpochMs: Long,
-        title: String,
-        taskType: String,
-        targetData: String = "",
-        taskId: Long = System.currentTimeMillis()
-    ): Boolean {
-        return scheduleTaskNotification(triggerEpochMs, taskId, title, taskType, targetData)
-    }
-
-    fun scheduleTaskNotification(
-        triggerEpochMs: Long,
-        taskId: Long,
-        title: String,
-        taskType: String,
-        targetData: String
-    ): Boolean {
-        return try {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-            val intent = Intent(context, com.aaya.assistant.engine.scheduler.ScheduledTaskReceiver::class.java).apply {
-                putExtra("EXTRA_TASK_ID", taskId)
-                putExtra("EXTRA_TITLE", title)
-                putExtra("EXTRA_TASK_TYPE", taskType)
-                putExtra("EXTRA_TARGET_DATA", targetData)
-            }
-            val pendingIntent = android.app.PendingIntent.getBroadcast(
-                context,
-                taskId.toInt(),
-                intent,
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-            )
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    android.app.AlarmManager.RTC_WAKEUP,
-                    triggerEpochMs,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    android.app.AlarmManager.RTC_WAKEUP,
-                    triggerEpochMs,
-                    pendingIntent
-                )
-            }
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    // WhatsApp Integration
+    // WhatsApp Message
     fun openWhatsApp(message: String, contactName: String? = null): Boolean {
         return try {
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = Uri.parse("https://api.whatsapp.com/send?text=${Uri.encode(message)}")
                 setPackage("com.whatsapp")
-                putExtra(Intent.EXTRA_TEXT, message)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
             true
         } catch (e: Exception) {
             try {
-                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, message)
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    data = Uri.parse("https://api.whatsapp.com/send?text=${Uri.encode(message)}")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                context.startActivity(Intent.createChooser(sendIntent, "Share message").apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                })
+                context.startActivity(intent)
                 true
             } catch (ex: Exception) {
                 false
             }
         }
-    }
-
-    // SOS Emergency Strobe Flashlight
-    @Volatile
-    private var isStrobeRunning = false
-    private var strobeThread: Thread? = null
-
-    fun startStrobeBeacon(durationSec: Int = 12) {
-        if (isStrobeRunning) return
-        isStrobeRunning = true
-        strobeThread = Thread {
-            val endTime = System.currentTimeMillis() + (durationSec * 1000L)
-            var state = false
-            while (isStrobeRunning && System.currentTimeMillis() < endTime) {
-                state = !state
-                toggleFlashlight(state)
-                try {
-                    Thread.sleep(150)
-                } catch (e: InterruptedException) {
-                    break
-                }
-            }
-            toggleFlashlight(false)
-            isStrobeRunning = false
-        }.apply {
-            isDaemon = true
-            start()
-        }
-    }
-
-    fun stopStrobeBeacon() {
-        isStrobeRunning = false
-        strobeThread?.interrupt()
-        strobeThread = null
-        toggleFlashlight(false)
     }
 
     // Direct Background SMS without touch

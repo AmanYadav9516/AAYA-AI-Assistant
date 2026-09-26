@@ -13,8 +13,8 @@ android {
         applicationId = "com.aaya.assistant"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "3.2.0"
+        versionCode = 9
+        versionName = "3.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

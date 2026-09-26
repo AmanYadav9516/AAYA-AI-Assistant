@@ -35,6 +35,7 @@ class CommandRouter(
 ) {
     private val deviceController = DeviceController(context)
     private val db = AayaDatabase.getInstance(context)
+    private val usagePoliceManager = com.aaya.assistant.engine.wellness.UsagePoliceManager(context)
 
     suspend fun routeAndExecute(rawSpokenText: String): ExecutionResult = withContext(Dispatchers.IO) {
         val query = rawSpokenText.trim()
@@ -226,16 +227,61 @@ class CommandRouter(
             return@withContext ExecutionResult(msg, "Bluetooth Settings", handledLocally = true)
         }
 
-        // 6. FAST LOCAL ROUTE: Volume
-        if (lower.contains("volume up") || lower.contains("awaz badhao") || lower.contains("sound up")) {
+        // 6. FAST LOCAL ROUTE: Volume Controls
+        if (lower.contains("volume up") || lower.contains("awaz badhao") || lower.contains("aawaz badhao") || lower.contains("volume badhao") || lower.contains("volume badha do") || lower.contains("sound up")) {
             deviceController.adjustVolume(increase = true)
-            speak("Volume increased.")
+            speak("Volume badha di gayi hai.")
             return@withContext ExecutionResult("Volume increased.", "Volume UP", handledLocally = true)
         }
-        if (lower.contains("volume down") || lower.contains("awaz kam karo") || lower.contains("sound down")) {
+        if (lower.contains("volume down") || lower.contains("awaz kam karo") || lower.contains("aawaz kam karo") || lower.contains("volume kam karo") || lower.contains("volume kam kar do") || lower.contains("sound down") || lower.contains("aawaz dheemi")) {
             deviceController.adjustVolume(increase = false)
-            speak("Volume decreased.")
+            speak("Volume kam kar di gayi hai.")
             return@withContext ExecutionResult("Volume decreased.", "Volume DOWN", handledLocally = true)
+        }
+        if (lower.contains("mute") || lower.contains("awaz band") || lower.contains("volume zero")) {
+            deviceController.muteVolume()
+            speak("Volume mute kar di gayi hai.")
+            return@withContext ExecutionResult("Volume muted.", "Mute", handledLocally = true)
+        }
+        if (lower.contains("volume full") || lower.contains("volume 100")) {
+            deviceController.setVolumePercent(100)
+            speak("Volume full kar di gayi hai.")
+            return@withContext ExecutionResult("Volume set to 100%.", "Volume MAX", handledLocally = true)
+        }
+        val volumePercentMatch = "(?i)volume\\s+(\\d{1,3})\\s*%?".toRegex().find(query)
+        if (volumePercentMatch != null) {
+            val pct = volumePercentMatch.groupValues[1].toIntOrNull() ?: 50
+            deviceController.setVolumePercent(pct)
+            speak("Volume $pct% par set kar di hai.")
+            return@withContext ExecutionResult("Volume set to $pct%.", "Volume $pct%", handledLocally = true)
+        }
+
+        // 6B. FAST LOCAL ROUTE: Screen Brightness Controls
+        if (lower.contains("brightness up") || lower.contains("brightness badhao") || lower.contains("brightness badha do") || lower.contains("roshni badhao")) {
+            val success = deviceController.adjustBrightness(increase = true)
+            val msg = if (success) "Brightness badha di gayi hai." else "Please allow Write System Settings permission to adjust brightness."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Brightness UP", handledLocally = true)
+        }
+        if (lower.contains("brightness down") || lower.contains("brightness kam karo") || lower.contains("brightness kam kar do") || lower.contains("roshni kam karo")) {
+            val success = deviceController.adjustBrightness(increase = false)
+            val msg = if (success) "Brightness kam kar di gayi hai." else "Please allow Write System Settings permission to adjust brightness."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Brightness DOWN", handledLocally = true)
+        }
+        if (lower.contains("brightness full") || lower.contains("brightness 100")) {
+            val success = deviceController.setBrightness(100)
+            val msg = if (success) "Brightness full 100% kar di hai." else "Please allow Write System Settings permission to adjust brightness."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Brightness MAX", handledLocally = true)
+        }
+        val brightnessPercentMatch = "(?i)brightness\\s+(\\d{1,3})\\s*%?".toRegex().find(query)
+        if (brightnessPercentMatch != null) {
+            val pct = brightnessPercentMatch.groupValues[1].toIntOrNull() ?: 50
+            val success = deviceController.setBrightness(pct)
+            val msg = if (success) "Brightness $pct% par set kar di hai." else "Please allow Write System Settings permission to adjust brightness."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Brightness $pct%", handledLocally = true)
         }
 
         // 7. FAST LOCAL ROUTE: Permission-Aware Calling & Multilingual Contact Match
@@ -451,7 +497,17 @@ class CommandRouter(
             return@withContext ExecutionResult(callInfo, "Last Call Query", handledLocally = true)
         }
 
-        // 20. FAST LOCAL ROUTE: YouTube Song Auto Play
+        // 20. FAST LOCAL ROUTE: Music Player (Local Library vs YouTube)
+        if (lower == "play music" || lower == "music chalao" || lower == "open music" || lower == "local music" ||
+            lower == "offline music" || lower.contains("phone ke gaane") || lower.contains("mera gaana") ||
+            lower.contains("music player") || lower.contains("phone music")) {
+            val ok = deviceController.launchLocalMusicPlayer()
+            val msg = if (ok) "Opening your local music player." else "Couldn't open local music player."
+            speak(msg)
+            logAudit("MEDIA", "Local Music Player")
+            return@withContext ExecutionResult(msg, "Music Player", handledLocally = true)
+        }
+
         if (lower.startsWith("play ") || lower.contains("chala do") || lower.contains("chalao") || lower.contains("gaana") || lower.contains("bhajan")) {
             val songName = query.replace("(?i)(play|song|gaana|bhajan|chala do|chalao|suno)".toRegex(), "").trim()
             val targetSong = if (songName.isNotBlank()) songName else "Hanuman Chalisa"
@@ -501,20 +557,145 @@ class CommandRouter(
         }
 
         // 23. FAST LOCAL ROUTE: Direct Background SMS without touch
-        if (lower.startsWith("send sms") || lower.contains("sms bhejo") || lower.contains("sms karo") || lower.contains("message bhej do")) {
-            val parts = query.split(" to ", " ko ", ignoreCase = true)
-            val recipient = if (parts.size > 1) parts[1].trim() else ""
-            val messageText = query.replace("(?i)(send sms|sms bhejo|sms karo|message bhej do| to .*| ko .*)".toRegex(), "").trim()
-            val cleanMsg = if (messageText.isNotBlank()) messageText else "Hello from AAYA!"
+        val isSmsCommand = (lower.startsWith("send sms") || lower.startsWith("sms to ") ||
+                            lower.contains("sms bhejo") || lower.contains("sms karo") ||
+                            lower.contains("message bhejo") || lower.contains("message bhej do") ||
+                            lower.contains("message karo")) && !lower.contains("whatsapp")
 
-            val match = if (recipient.isNotBlank()) contactMatcher.resolveAndFindContact(recipient) else null
+        if (isSmsCommand) {
+            if (!deviceController.hasSmsPermission()) {
+                val msg = "Please grant SMS permission in Permissions tab so I can send messages for you."
+                speak(msg)
+                return@withContext ExecutionResult(msg, "SMS Permission Required", handledLocally = true)
+            }
+
+            var targetName = ""
+            var messageBody = ""
+
+            // Pattern 1: Hindi/Hinglish "[Name] ko [sms/message] [bhejo/karo] [ki/that] [message]"
+            val hindiKoMatch = Regex("""^(.*?)\s+ko\s+(?:sms|message)\s+(?:bhejo|karo|bhej do|kardo)(?:\s+(?:ki|that)\s+(.*))?$""", RegexOption.IGNORE_CASE).find(query.trim())
+            if (hindiKoMatch != null) {
+                targetName = hindiKoMatch.groupValues[1].trim()
+                messageBody = hindiKoMatch.groupValues.getOrNull(2)?.trim() ?: ""
+            } else {
+                // Pattern 2: English "send sms to [Name] (that|saying|:)? [Message]"
+                val englishToMatch = Regex("""^(?:send\s+sms|sms|send\s+message)\s+to\s+([^\s:]+)(?:\s+(?:that|saying|:|ki)\s+(.*)|\s+(.*))?$""", RegexOption.IGNORE_CASE).find(query.trim())
+                if (englishToMatch != null) {
+                    targetName = englishToMatch.groupValues[1].trim()
+                    messageBody = (englishToMatch.groupValues.getOrNull(2) ?: englishToMatch.groupValues.getOrNull(3) ?: "").trim()
+                }
+            }
+
+            // Fallback parsing if regex did not capture name
+            if (targetName.isBlank()) {
+                val parts = query.split(" to ", " ko ", ignoreCase = true)
+                if (parts.size > 1) {
+                    targetName = parts[0].replace("(?i)(send sms|send message|sms|message)".toRegex(), "").trim()
+                    if (targetName.isBlank()) {
+                        val subParts = parts[1].split(" ", limit = 2)
+                        targetName = subParts[0]
+                        messageBody = if (subParts.size > 1) subParts[1] else ""
+                    } else {
+                        messageBody = parts[1].replace("(?i)(sms|message|bhejo|karo|bhej do|ki )".toRegex(), "").trim()
+                    }
+                }
+            }
+
+            val cleanMsg = if (messageBody.isNotBlank()) messageBody else "Hello from AAYA!"
+            val match = if (targetName.isNotBlank()) contactMatcher.resolveAndFindContact(targetName) else null
+
             if (match != null) {
-                deviceController.sendDirectSms(match.phoneNumber, cleanMsg)
-                val msg = "Sent SMS to ${match.contactName}: \"$cleanMsg\""
+                val sent = deviceController.sendDirectSms(match.phoneNumber, cleanMsg)
+                val msg = if (sent) "Sent SMS to ${match.contactName}: \"$cleanMsg\"" else "Failed to send SMS. Please check SIM balance or permissions."
                 speak(msg)
                 logAudit("SMS", "Direct SMS to ${match.contactName}")
                 return@withContext ExecutionResult(msg, "SMS: ${match.contactName}", handledLocally = true)
+            } else {
+                val msg = if (targetName.isNotBlank()) "Could not find contact for $targetName." else "Who would you like to send the SMS to?"
+                speak(msg)
+                return@withContext ExecutionResult(msg, "SMS Target Unknown", handledLocally = true)
             }
+        }
+
+        // 24. FAST LOCAL ROUTE: Screen Time & App Usage Tracking
+        if (lower.contains("screen time") || lower.contains("app usage") || lower.contains("phone kitna use") ||
+            lower.contains("kitna phone chalaya") || lower.contains("usage summary") || lower.contains("phone usage")) {
+            val usageSummary = usagePoliceManager.getTodayUsageSummary()
+            speak(usageSummary)
+            logAudit("WELLNESS", "Screen Time / App Usage Checked")
+            return@withContext ExecutionResult(usageSummary, "Screen Time Summary", handledLocally = true)
+        }
+
+        // 25. FAST LOCAL ROUTE: Live Location, PIN Code, District, Jaipur Distance, Nearby Places
+        if (lower.contains("jaipur se") || lower.contains("from jaipur") || lower.contains("jaipur kitni") ||
+            lower.contains("distance from jaipur") || lower.contains("distance to jaipur")) {
+            val distKm = deviceController.getDistanceFromJaipur()
+            val msg = if (distKm != null) {
+                "Aapki current location se Jaipur lagbhag $distKm kilometer door hai."
+            } else {
+                "Please enable Location permission and GPS to calculate distance from Jaipur."
+            }
+            speak(msg)
+            logAudit("LOCATION", "Jaipur Distance: ${distKm ?: "Unknown"} km")
+            return@withContext ExecutionResult(msg, "Jaipur: ${distKm ?: "N/A"} km", handledLocally = true)
+        }
+
+        if (lower.contains("pin code") || lower.contains("pincode") || lower.contains("postal code") || lower.contains("zip code")) {
+            val loc = deviceController.getLiveLocationDetails()
+            val msg = if (loc != null && loc.pinCode.isNotBlank()) {
+                "Aapki current location ka PIN code ${loc.pinCode} hai (${loc.district.ifBlank { loc.city }}, ${loc.state})."
+            } else if (loc != null) {
+                "Aapki location mil gayi hai (${loc.city}, ${loc.state}), par PIN code detect nahi ho paya."
+            } else {
+                "Please enable Location permission and GPS to check your PIN code."
+            }
+            speak(msg)
+            logAudit("LOCATION", "PIN Code query: ${loc?.pinCode ?: "Unknown"}")
+            return@withContext ExecutionResult(msg, "PIN: ${loc?.pinCode ?: "N/A"}", handledLocally = true)
+        }
+
+        if (lower.contains("district") || lower.contains("zila") || lower.contains("jila")) {
+            val loc = deviceController.getLiveLocationDetails()
+            val msg = if (loc != null && loc.district.isNotBlank()) {
+                "Aapka current district ${loc.district} hai, ${loc.state}, ${loc.country}."
+            } else {
+                "Location permission aur GPS on rakhein taaki district pata lag sake."
+            }
+            speak(msg)
+            logAudit("LOCATION", "District: ${loc?.district ?: "Unknown"}")
+            return@withContext ExecutionResult(msg, "District: ${loc?.district ?: "N/A"}", handledLocally = true)
+        }
+
+        if (lower.contains("live location") || lower.contains("current location") || lower.contains("kahan hoon") ||
+            lower.contains("meri location") || lower.contains("where am i") || lower.contains("mera rajya") || lower.contains("mera state")) {
+            val loc = deviceController.getLiveLocationDetails()
+            val msg = if (loc != null) {
+                buildString {
+                    append("Aap is samay ")
+                    if (loc.area.isNotBlank()) append("${loc.area}, ")
+                    if (loc.city.isNotBlank()) append("${loc.city}, ")
+                    if (loc.district.isNotBlank() && loc.district != loc.city) append("${loc.district}, ")
+                    if (loc.state.isNotBlank()) append("${loc.state}, ")
+                    append("${loc.country} mein hain.")
+                    if (loc.pinCode.isNotBlank()) append(" PIN code: ${loc.pinCode}.")
+                }
+            } else {
+                "Please enable Location permission and GPS to detect your live location."
+            }
+            speak(msg)
+            logAudit("LOCATION", "Live Location: ${loc?.city ?: "Unknown"}")
+            return@withContext ExecutionResult(msg, "Live Location", handledLocally = true)
+        }
+
+        if (lower.contains("near me") || lower.contains("nearest") || lower.contains("pass me ") ||
+            lower.contains("aas pass") || lower.contains("nearby")) {
+            val placeType = query.replace("(?i)(near me|nearest|nearby|pass me|aas pass|dekhao|khojo|batao|kahan hai)".toRegex(), "").trim()
+            val target = if (placeType.isNotBlank()) placeType else "coffee shop"
+            val ok = deviceController.openNearbySearchInMaps(target)
+            val msg = if (ok) "Showing $target near you on Google Maps." else "Could not open Google Maps."
+            speak(msg)
+            logAudit("LOCATION", "Nearby search: $target")
+            return@withContext ExecutionResult(msg, "Near: $target", handledLocally = true)
         }
 
         // 24. FAST LOCAL ROUTE: Deep Memory & Recall (Timetable, Medicine, Family Names)
@@ -570,9 +751,9 @@ class CommandRouter(
                 )
             }
             is GeminiResult.Error -> {
-                val fallbackMsg = "I couldn't reach the AI server. Please check your network or API key in Settings."
+                val fallbackMsg = "AI server abhi busy ya high traffic par hai. Kripya kuch second baad dobara koshish karein ya network check karein."
                 speak(fallbackMsg)
-                ExecutionResult(fallbackMsg, "API Error: ${result.errorMessage}", handledLocally = false)
+                ExecutionResult(fallbackMsg, "API Busy: ${result.errorMessage}", handledLocally = false)
             }
         }
     }
@@ -739,6 +920,49 @@ class CommandRouter(
                     executedSummaries.add("${fest.title}: ${fest.wishesHindi}")
                 } else {
                     executedSummaries.add("Wishing you happy and auspicious festivities!")
+                }
+            }
+            "set_brightness" -> {
+                val level = (tool.args["brightness_level"] as? Number)?.toInt() ?: 70
+                val ok = deviceController.setBrightness(level)
+                executedSummaries.add(if (ok) "Brightness set to $level%" else "Brightness permission needed")
+            }
+            "adjust_volume" -> {
+                val level = (tool.args["volume_level"] as? Number)?.toInt()
+                if (level != null) {
+                    deviceController.setVolumePercent(level)
+                    executedSummaries.add("Volume set to $level%")
+                } else {
+                    val action = tool.args["action"]?.toString() ?: "up"
+                    if (action.contains("mute", ignoreCase = true)) {
+                        deviceController.muteVolume()
+                        executedSummaries.add("Muted volume")
+                    } else {
+                        deviceController.adjustVolume(action.equals("up", ignoreCase = true))
+                        executedSummaries.add("Volume adjusted")
+                    }
+                }
+            }
+            "send_sms" -> {
+                val contact = tool.args["contact_name"]?.toString() ?: ""
+                val body = tool.args["message_text"]?.toString() ?: "Hello from AAYA!"
+                val match = contactMatcher.resolveAndFindContact(contact)
+                if (match != null) {
+                    val ok = deviceController.sendDirectSms(match.phoneNumber, body)
+                    executedSummaries.add(if (ok) "Sent SMS to ${match.contactName}" else "Failed to send SMS")
+                } else {
+                    executedSummaries.add("Could not find contact $contact")
+                }
+            }
+            "get_screen_time" -> {
+                executedSummaries.add(usagePoliceManager.getTodayUsageSummary())
+            }
+            "get_location" -> {
+                val loc = deviceController.getLiveLocationDetails()
+                if (loc != null) {
+                    executedSummaries.add("Location: ${loc.city}, ${loc.state}, PIN: ${loc.pinCode}")
+                } else {
+                    executedSummaries.add("Location unavailable - enable GPS")
                 }
             }
         }

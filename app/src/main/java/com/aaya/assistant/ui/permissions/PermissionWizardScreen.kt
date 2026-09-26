@@ -110,7 +110,8 @@ fun PermissionWizardScreen(onAllGranted: () -> Unit) {
                             step.customIntentAction != null -> {
                                 try {
                                     val intent = Intent(step.customIntentAction)
-                                    if (step.customIntentAction == Settings.ACTION_MANAGE_OVERLAY_PERMISSION) {
+                                    if (step.customIntentAction == Settings.ACTION_MANAGE_OVERLAY_PERMISSION ||
+                                        step.customIntentAction == Settings.ACTION_MANAGE_WRITE_SETTINGS) {
                                         intent.data = Uri.parse("package:${context.packageName}")
                                     }
                                     context.startActivity(intent)
@@ -302,6 +303,31 @@ private fun computePermissionSteps(context: Context): List<PermissionStep> {
         Manifest.permission.CALL_PHONE
     ) == PackageManager.PERMISSION_GRANTED
 
+    val isSmsGranted = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.SEND_SMS
+    ) == PackageManager.PERMISSION_GRANTED
+
+    val isWriteSettingsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        Settings.System.canWrite(context)
+    } else true
+
+    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+    val isUsageGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        appOps.unsafeCheckOpNoThrow(
+            android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+            android.os.Process.myUid(),
+            context.packageName
+        ) == android.app.AppOpsManager.MODE_ALLOWED
+    } else {
+        @Suppress("DEPRECATION")
+        appOps.checkOpNoThrow(
+            android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+            android.os.Process.myUid(),
+            context.packageName
+        ) == android.app.AppOpsManager.MODE_ALLOWED
+    }
+
     return listOf(
         PermissionStep(
             id = 1,
@@ -374,6 +400,33 @@ private fun computePermissionSteps(context: Context): List<PermissionStep> {
             privacyGuarantee = "Used solely for global screenshot capture. No personal data collected.",
             isGranted = com.aaya.assistant.engine.service.HardwareKeyAccessibilityService.isServiceRunning(),
             customIntentAction = Settings.ACTION_ACCESSIBILITY_SETTINGS
+        ),
+        PermissionStep(
+            id = 9,
+            title = "Direct Background SMS",
+            icon = Icons.Default.Message,
+            description = "Enables touchless direct SMS sending ('Mummy ko SMS bhejo').",
+            privacyGuarantee = "Messages are sent only when you explicitly command it. Zero unauthorized dispatches.",
+            isGranted = isSmsGranted,
+            permissionManifestKey = Manifest.permission.SEND_SMS
+        ),
+        PermissionStep(
+            id = 10,
+            title = "Screen Brightness Control",
+            icon = Icons.Default.BrightnessMedium,
+            description = "Allows AAYA to increase/decrease device brightness by voice.",
+            privacyGuarantee = "Only alters display brightness upon your voice command.",
+            isGranted = isWriteSettingsGranted,
+            customIntentAction = Settings.ACTION_MANAGE_WRITE_SETTINGS
+        ),
+        PermissionStep(
+            id = 11,
+            title = "Usage Access (Screen Time)",
+            icon = Icons.Default.AccessTime,
+            description = "Allows AAYA to report your daily screen time and protect against app addiction.",
+            privacyGuarantee = "Usage statistics are analyzed strictly on-device. Never uploaded or shared.",
+            isGranted = isUsageGranted,
+            customIntentAction = Settings.ACTION_USAGE_ACCESS_SETTINGS
         )
     )
 }

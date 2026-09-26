@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AAYA AI Assistant — Next-Gen Android Voice Intelligence</title>
+  <meta name="description" content="AAYA is a futuristic, hands-free Android voice assistant with Siri-style animated pop-ups, zero mic flicker, offline hardware controls, live location, and Gemini AI reasoning.">
+  <link rel="icon" type="image/jpeg" href="./assets/aaya-logo.jpg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&family=Space+Grotesk:wght@500;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="cyber-bg">
+
+  <!-- Glow Background Canvas / Particles -->
+  <div class="ambient-glow glow-cyan"></div>
+  <div class="ambient-glow glow-magenta"></div>
+  <div class="ambient-glow glow-purple"></div>
+
+  <!-- Cyber Navigation Header -->
+  <header class="cyber-nav">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="logo-wrapper">
+          <img src="./assets/aaya-logo.jpg" alt="AAYA Logo" class="brand-logo">
+          <span class="logo-ring"></span>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">AAYA</span>
+          <span class="version-badge">v3.3.0 LIVE</span>
+        </div>
+      </div>
+
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#demo">Live Simulator</a>
+        <a href="#commands">Voice Commands</a>
+        <a href="#download" class="nav-cta-btn">
+          <span>Get APK</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main>
+    <section class="hero-section">
+      <div class="hero-content">
+        <div class="tech-pill">
+          <span class="pulsing-dot"></span>
+          <span class="tech-pill-text">// NEXT-GEN VOICE INTELLIGENCE FOR ANDROID</span>
+        </div>
+
+        <h1 class="hero-title">
+          <span class="reveal-line">THE SMART VOICE AI</span>
+          <span class="neon-rgb text-gradient-rgb">BUILT FOR REAL LIFE.</span>
+        </h1>
+
+        <p class="hero-subtext">
+          Zero Mic Flicker. Floating Siri Aurora Pop-Up. 100% Hands-Free Hardware Controls. Experience dual-brain offline speed and Google Gemini reasoning on your phone.
+        </p>
+
+        <!-- Multi-layer Glowing RGB Download CTA -->
+        <div class="cta-wrapper">
+          <a href="https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.3.0/app-debug.apk" class="btn-rgb-glow" id="downloadApkBtn" download>
+            <span class="btn-shimmer"></span>
+            <span class="btn-inner">
+              <svg class="android-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-1.0003s.4482-.9993 1-.9993c.551 0 .9993.4476.9993.9993 0 .5517-.4483 1.0003-.9993 1.0003m-11.046 0c-.5511 0-.9993-.4486-.9993-1.0003s.4482-.9993 1-.9993c.5511 0 .9993.4476.9993.9993 0 .5517-.4482 1.0003-.9993 1.0003m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.4116 13.8533 8.077 12 8.077c-1.8533 0-3.5902.3346-5.1368.8727L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"/>
+              </svg>
+              <span class="btn-text-group">
+                <span class="btn-primary-title">DOWNLOAD AAYA v3.3.0 APK</span>
+                <span class="btn-secondary-subtitle">Direct Fast Install (25 MB) • Android 8.0 - 14+</span>
+              </span>
+              <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </span>
+          </a>
+
+          <a href="https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.3.0/AAYA-Assistant.zip" class="btn-glass" download>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 9h9M3 15h9"/></svg>
+            <span>Download ZIP Package (Share on WhatsApp)</span>
+          </a>
+        </div>
+
+        <div class="metrics-bar">
+          <div class="metric-item">
+            <span class="metric-val neon-cyan">&lt; 150ms</span>
+            <span class="metric-label">Offline Voice Routing</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-item">
+            <span class="metric-val neon-green">0%</span>
+            <span class="metric-label">Idle Mic Battery Drain</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-item">
+            <span class="metric-val neon-pink">100%</span>
+            <span class="metric-label">Realme & ColorOS Overlay Bypass</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Siri Simulator Device Mockup -->
+      <div class="hero-simulator" id="demo">
+        <div class="phone-frame">
+          <div class="phone-speaker"></div>
+          <div class="phone-screen">
+            <!-- Simulated App in background -->
+            <div class="mock-background-app">
+              <div class="mock-app-header">
+                <span class="mock-time">09:41</span>
+                <div class="mock-app-icons">5G 100%</div>
+              </div>
+              <div class="mock-card-dummy"></div>
+              <div class="mock-card-dummy short"></div>
+            </div>
+
+            <!-- Siri Floating Translucent Overlay -->
+            <div class="siri-floating-card active" id="siriCard">
+              <div class="siri-card-aurora"></div>
+              <div class="siri-card-content">
+                <div class="siri-top-bar">
+                  <div class="siri-badge">
+                    <span class="radar-dot"></span>
+                    <span id="siriStatusText">AAYA LISTENING</span>
+                  </div>
+                  <span class="timer-badge">5s auto-sleep</span>
+                </div>
+
+                <div class="siri-waveform">
+                  <span class="bar bar-1"></span>
+                  <span class="bar bar-2"></span>
+                  <span class="bar bar-3"></span>
+                  <span class="bar bar-4"></span>
+                  <span class="bar bar-5"></span>
+                </div>
+
+                <div class="siri-transcript-box">
+                  <p class="transcript-query" id="simulatorQuery">"AAYA, aaj ka screen time kitna hai?"</p>
+                  <p class="transcript-response" id="simulatorResponse">Aaj aapka total screen time 1h 45m hai. Sabse zyada: 45 min YouTube, 30 min WhatsApp.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Interactive Voice Chips to Test Simulator -->
+            <div class="simulator-controls">
+              <span class="sim-caption">TAP A COMMAND TO TEST LIVE:</span>
+              <div class="chip-container">
+                <button class="sim-chip active" onclick="simulateCommand('AAYA, aaj ka screen time kitna hai?', 'Aaj aapka total screen time 1h 45m hai. Sabse zyada: YouTube aur WhatsApp.')">📊 Screen Time</button>
+                <button class="sim-chip" onclick="simulateCommand('Brightness 50% kardo', 'Screen brightness set to 50%.')">☀️ Brightness 50%</button>
+                <button class="sim-chip" onclick="simulateCommand('Mera pin code kya hai?', 'Aapki current location ka PIN code 302001 hai (Jaipur, Rajasthan).')">📍 PIN Code</button>
+                <button class="sim-chip" onclick="simulateCommand('Aman ko SMS bhejo ki main late aaunga', 'Direct background SMS dispatched to Aman: \"Main late aaunga\".')">💬 Touchless SMS</button>
+                <button class="sim-chip" onclick="simulateCommand('Nearest coffee shop dikhao', 'Opening nearest coffee shops on Google Maps.')">☕ Nearby Places</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Kinetic Typography Scroll Section -->
+    <section class="kinetic-scroll-section">
+      <div class="kinetic-container">
+        <p class="kinetic-sub">// SCROLL TO EXPAND THE MATRIX</p>
+        <div class="growing-word-track">
+          <h2 class="grow-word word-1">HANDS-FREE.</h2>
+          <h2 class="grow-word word-2 neon-glow-cyan">INSTANT.</h2>
+          <h2 class="grow-word word-3 neon-glow-magenta">ZERO-FLICKER.</h2>
+          <h2 class="grow-word word-4 neon-glow-purple">UNSTOPPABLE.</h2>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature Grid Section -->
+    <section class="features-section" id="features">
+      <div class="section-header">
+        <span class="section-tag">// ARCHITECTURE & CAPABILITIES</span>
+        <h2 class="section-title">ENGINEERED FOR <span class="neon-rgb">PERFECTION</span></h2>
+        <p class="section-desc">Every feature meticulously built to solve real Android daily frictions without complex menus.</p>
+      </div>
+
+      <div class="features-grid">
+        <!-- Feature 1: Hardware Brightness & Volume -->
+        <div class="feature-card cyber-border">
+          <div class="card-glow"></div>
+          <div class="feature-icon neon-cyan-bg">☀️</div>
+          <h3>Native Hardware Controls</h3>
+          <p>Voice-driven brightness & volume adjustments. Set exact levels ("brightness 50%"), mute audio instantly, or toggle flashlight without ever touching the notification shade.</p>
+          <div class="feature-pill-row">
+            <span class="tag-pill">Brightness %</span>
+            <span class="tag-pill">Volume Mute</span>
+            <span class="tag-pill">Flashlight</span>
+          </div>
+        </div>
+
+        <!-- Feature 2: Siri Pop-Up & Zero Flicker -->
+        <div class="feature-card cyber-border">
+          <div class="card-glow"></div>
+          <div class="feature-icon neon-magenta-bg">🫧</div>
+          <h3>Bulletproof Siri Pop-Up</h3>
+          <p>Renders a translucent Compose card with a dancing neon audio waveform over any active app. Optimized specifically for Realme, Oppo, and OnePlus ColorOS restriction bypass.</p>
+          <div class="feature-pill-row">
+            <span class="tag-pill">Zero Mic Flicker</span>
+            <span class="tag-pill">5s Sleep Timer</span>
+            <span class="tag-pill">Audio Waves</span>
+          </div>
+        </div>
+
+        <!-- Feature 3: Live Geocoding & PIN Code -->
+        <div class="feature-card cyber-border">
+          <div class="card-glow"></div>
+          <div class="feature-icon neon-green-bg">📍</div>
+          <h3>Live Geocoding & PIN Search</h3>
+          <p>Get instant live location details, district names, state, and exact postal PIN code on-device. Calculate distance to Jaipur or launch mapped searches for nearby cafes and hotels.</p>
+          <div class="feature-pill-row">
+            <span class="tag-pill">Postal PIN</span>
+            <span class="tag-pill">Distance Calc</span>
+            <span class="tag-pill">Maps Intent</span>
+          </div>
+        </div>
+
+        <!-- Feature 4: Touchless SMS & WhatsApp -->
+        <div class="feature-card cyber-border">
+          <div class="card-glow"></div>
+          <div class="feature-icon neon-purple-bg">💬</div>
+          <h3>Direct Background SMS</h3>
+          <p>Send real cellular SMS messages hands-free in the background without touching your screen. Powered by bilingual regex contact extraction and fuzzy relation resolver.</p>
+          <div class="feature-pill-row">
+            <span class="tag-pill">No Screen Touch</span>
+            <span class="tag-pill">Contact Matcher</span>
+            <span class="tag-pill">WhatsApp</span>
+          </div>
+        </div>
+
+        <!-- Feature 5: Screen Time & Wellness Police -->
+        <div class="feature-card cyber-border">
+          <div class="card-glow"></div>
+          <div class="feature-icon neon-yellow-bg">📊</div>
+          <h3>App Usage & Screen Police</h3>
+          <p>Ask "aaj kitna phone chalaya" to get a detailed breakdown of your total screen time and top 3 apps used today. Protects focus with automated app limits and gentle nudges.</p>
+          <div class="feature-pill-row">
+            <span class="tag-pill">Daily Summary</span>
+            <span class="tag-pill">App Limits</span>
+            <span class="tag-pill">Hydration Nudges</span>
+          </div>
+        </div>
+
+        <!-- Feature 6: Dual-Brain Intelligence -->
+        <div class="feature-card cyber-border">
+          <div class="card-glow"></div>
+          <div class="feature-icon neon-cyan-bg">🧠</div>
+          <h3>Dual-Brain AI Architecture</h3>
+          <p>Ultra-fast on-device routing executes 90% of phone tasks in milliseconds offline. Complex questions automatically escalate to Google Gemini 3.6 Flash with traffic-aware fallbacks.</p>
+          <div class="feature-pill-row">
+            <span class="tag-pill">Local Router</span>
+            <span class="tag-pill">Gemini 3.6</span>
+            <span class="tag-pill">Traffic Safe</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Voice Commands Showcase -->
+    <section class="commands-section" id="commands">
+      <div class="section-header">
+        <span class="section-tag">// NATURAL HINDI + ENGLISH COMMANDS</span>
+        <h2 class="section-title">SPEAK FREELY. <span class="neon-rgb">NO SCRIPTS NEEDED.</span></h2>
+      </div>
+
+      <div class="command-showcase-container">
+        <div class="command-group">
+          <h4 class="group-title">⚡ HARDWARE & SYSTEM</h4>
+          <ul class="cmd-list">
+            <li><code>"Brightness 50% kardo"</code> <span>Adjusts screen brightness</span></li>
+            <li><code>"Awaaz badhao" / "Volume mute kardo"</code> <span>Volume controls</span></li>
+            <li><code>"Flashlight chalao"</code> <span>Toggles torch instantly</span></li>
+            <li><code>"Screenshot le lo"</code> <span>Voice accessibility screenshot</span></li>
+            <li><code>"Music chalao"</code> <span>Opens local phone audio player</span></li>
+          </ul>
+        </div>
+
+        <div class="command-group">
+          <h4 class="group-title">📍 LOCATION & EXPLORATION</h4>
+          <ul class="cmd-list">
+            <li><code>"Mera PIN code kya hai?"</code> <span>Postal PIN & live area</span></li>
+            <li><code>"Kaunsa district hai ye?"</code> <span>District & state info</span></li>
+            <li><code>"Jaipur se kitni doori hai?"</code> <span>Live GPS distance calculation</span></li>
+            <li><code>"Nearest coffee shop dikhao"</code> <span>Opens Google Maps query</span></li>
+            <li><code>"Near barber / 5 star hotel"</code> <span>Instant nearby search</span></li>
+          </ul>
+        </div>
+
+        <div class="command-group">
+          <h4 class="group-title">💬 CALLS & MESSAGING</h4>
+          <ul class="cmd-list">
+            <li><code>"Papa ko call lagao speaker par"</code> <span>Direct speakerphone call</span></li>
+            <li><code>"Aman ko SMS bhejo ki main late hoon"</code> <span>Direct background SMS</span></li>
+            <li><code>"WhatsApp karo Mummy ko"</code> <span>Launches WhatsApp chat</span></li>
+            <li><code>"Aakhiri call kiski thi?"</code> <span>Reads last incoming call</span></li>
+            <li><code>"Emergency SOS"</code> <span>Flashes strobe beacon</span></li>
+          </ul>
+        </div>
+
+        <div class="command-group">
+          <h4 class="group-title">🛡️ WELLNESS & RECALL</h4>
+          <ul class="cmd-list">
+            <li><code>"Aaj ka screen time kitna hai?"</code> <span>App usage analytics</span></li>
+            <li><code>"Dawai lene ka time yaad dilao"</code> <span>Smart medicine reminder</span></li>
+            <li><code>"Yaad rakhna meri cycle key drawer me hai"</code> <span>Long-term memory</span></li>
+            <li><code>"Meri cycle key kahan hai?"</code> <span>Instant recall</span></li>
+            <li><code>"45 minute ka study timer chalu karo"</code> <span>Pomodoro + DND mode</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download Vault Section -->
+    <section class="download-section" id="download">
+      <div class="download-box cyber-border">
+        <div class="box-glow"></div>
+        <div class="download-content">
+          <span class="vault-tag">// OFFICIAL PRODUCTION RELEASE</span>
+          <h2 class="vault-title">DOWNLOAD <span class="neon-rgb">AAYA v3.3.0</span> NOW</h2>
+          <p class="vault-subtitle">Experience the ultimate Android voice assistant. Free, open source, and packed with futuristic innovations.</p>
+
+          <div class="download-cards-row">
+            <div class="dl-card primary-card">
+              <div class="card-badge">RECOMMENDED</div>
+              <h3>APK Direct Package</h3>
+              <p>Standard Android package ready for 1-tap installation on any Android phone.</p>
+              <a href="https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.3.0/app-debug.apk" class="btn-rgb-glow dl-btn" download>
+                <span class="btn-inner">Download .APK (25 MB)</span>
+              </a>
+            </div>
+
+            <div class="dl-card secondary-card">
+              <div class="card-badge">SHARING FRIENDLY</div>
+              <h3>ZIP Archive</h3>
+              <p>Packaged zip archive designed for sharing via WhatsApp, Telegram, or Gmail.</p>
+              <a href="https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.3.0/AAYA-Assistant.zip" class="btn-glass dl-btn" download>
+                <span>Download .ZIP (25 MB)</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="compatibility-notice">
+            <span>🛡️ <strong>Compatibility:</strong> Android 8.0 Oreo up to Android 14+ (HyperOS, One UI, ColorOS, OxygenOS, Stock Pixel).</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Cyber Footer -->
+  <footer class="cyber-footer">
+    <div class="footer-container">
+      <div class="footer-left">
+        <div class="brand footer-brand">
+          <img src="./assets/aaya-logo.jpg" alt="AAYA" class="brand-logo sm">
+          <span>AAYA AI Assistant</span>
+        </div>
+        <p class="footer-tagline">Engineered for real life. Autonomous voice intelligence for everyone.</p>
+      </div>
+
+      <div class="footer-right">
+        <a href="https://github.com/AmanYadav9516/AAYA-AI-Assistant" target="_blank" rel="noopener noreferrer" class="footer-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span>GitHub Repository</span>
+        </a>
+        <a href="https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases" target="_blank" rel="noopener noreferrer" class="footer-link">Releases</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 AAYA AI Assistant. Built with passion by Aman Yadav. Released under MIT License.</p>
+    </div>
+  </footer>
+
+  <script src="./script.js"></script>
+</body>
+</html>
