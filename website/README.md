@@ -2,7 +2,10 @@
 
 Welcome to the official landing page for **AAYA AI Assistant**!
 
-This website is engineered with a futuristic cyberpunk aesthetic, dynamic scroll-driven kinetic typography, an interactive Siri soundwave phone simulator, and multi-layer RGB glowing download buttons.
+### 🔗 Live Website URL:
+👉 **[https://amanyadav9516.github.io/AAYA-AI-Assistant/](https://amanyadav9516.github.io/AAYA-AI-Assistant/)**
+
+This website is automatically built and deployed to GitHub Pages on every commit via GitHub Actions (`.github/workflows/deploy-pages.yml`).
 
 ---
 
