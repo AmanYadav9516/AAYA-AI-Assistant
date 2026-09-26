@@ -571,4 +571,134 @@ class DeviceController(private val context: Context) {
             false
         }
     }
+
+    // Camera & Settings Aliases
+    fun takeSelfie(): Boolean = openSelfieCamera()
+    fun recordVideo(): Boolean = openVideoCamera()
+    fun openSettings(): Boolean = openAppSettings()
+
+    // Timers & Alarms
+    fun setTimer(seconds: Int, message: String = "AAYA Timer"): Boolean {
+        return try {
+            val intent = Intent(AlarmClock.ACTION_SET_TIMER).apply {
+                putExtra(AlarmClock.EXTRA_LENGTH, seconds)
+                putExtra(AlarmClock.EXTRA_MESSAGE, message)
+                putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // Task Scheduling & Alarms
+    fun scheduleExactTask(
+        triggerEpochMs: Long,
+        title: String,
+        taskType: String,
+        targetData: String = "",
+        taskId: Long = System.currentTimeMillis()
+    ): Boolean {
+        return scheduleTaskNotification(triggerEpochMs, taskId, title, taskType, targetData)
+    }
+
+    fun scheduleTaskNotification(
+        triggerEpochMs: Long,
+        taskId: Long,
+        title: String,
+        taskType: String,
+        targetData: String
+    ): Boolean {
+        return try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            val intent = Intent(context, com.aaya.assistant.engine.scheduler.ScheduledTaskReceiver::class.java).apply {
+                putExtra("EXTRA_TASK_ID", taskId)
+                putExtra("EXTRA_TITLE", title)
+                putExtra("EXTRA_TASK_TYPE", taskType)
+                putExtra("EXTRA_TARGET_DATA", targetData)
+            }
+            val pendingIntent = android.app.PendingIntent.getBroadcast(
+                context,
+                taskId.toInt(),
+                intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    triggerEpochMs,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    triggerEpochMs,
+                    pendingIntent
+                )
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // SOS Emergency Strobe Flashlight
+    @Volatile
+    private var isStrobeRunning = false
+    private var strobeThread: Thread? = null
+
+    fun startStrobeBeacon(durationSec: Int = 12) {
+        if (isStrobeRunning) return
+        isStrobeRunning = true
+        strobeThread = Thread {
+            val endTime = System.currentTimeMillis() + (durationSec * 1000L)
+            var state = false
+            while (isStrobeRunning && System.currentTimeMillis() < endTime) {
+                state = !state
+                toggleFlashlight(state)
+                try {
+                    Thread.sleep(150)
+                } catch (e: InterruptedException) {
+                    break
+                }
+            }
+            toggleFlashlight(false)
+            isStrobeRunning = false
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    fun stopStrobeBeacon() {
+        isStrobeRunning = false
+        strobeThread?.interrupt()
+        strobeThread = null
+        toggleFlashlight(false)
+    }
+
+    // Web Search
+    fun searchWeb(query: String): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
+                putExtra(android.app.SearchManager.QUERY, query)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            try {
+                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=${Uri.encode(query)}")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(webIntent)
+                true
+            } catch (ex: Exception) {
+                false
+            }
+        }
+    }
 }
