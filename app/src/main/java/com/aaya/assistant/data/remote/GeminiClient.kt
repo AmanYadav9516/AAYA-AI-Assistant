@@ -134,6 +134,11 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
             // If OpenRouter failed and Gemini key exists, fall through to Gemini
         }
 
+        if (preferenceManager.isUserBlocked) {
+            val reason = preferenceManager.userBlockedReason.ifBlank { "Account temporarily suspended by administrator." }
+            return@withContext GeminiResult.Error(reason)
+        }
+
         val apiKey = preferenceManager.apiKey.ifEmpty { DEFAULT_FALLBACK_KEY }
         if (apiKey.isBlank()) {
             if (preferenceManager.openRouterApiKey.isNotBlank()) {
@@ -206,6 +211,9 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
                     preferenceManager.successfulApiRequests += 1
                     preferenceManager.lastApiLatencyMs = latency
                     preferenceManager.lastApiError = null
+                    try {
+                        com.aaya.assistant.AayaApplication.instance.firebaseUserManager.incrementApiRequest()
+                    } catch (_: Exception) {}
 
                     // Parse Candidates & Function Calls
                     val responseJson = JSONObject(responseString)
@@ -359,9 +367,22 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
         return """
             You are AAYA, an elite voice and lifestyle AI assistant for Android.
             Your answers are concise, friendly, and optimized for voice speech (TTS).
-            Keep spoken voice answers under 1-2 sentences. Never reply with verbose paragraphs.
-            Understand multilingual phrases in English, Hindi, and Hinglish (e.g., 'Mummy ko call karo', 'Papa ko phone lagao', 'Silent mode on karo', 'Ye note save karo', '50 rupay chai me kharch huye').
-            When a user requests one or multiple device actions (e.g. 'Set alarm for 7, turn on torch, and activate sleep mode'), invoke all relevant function calls simultaneously.
+            Always pronounce your name as 'Aaya' (never spell it out as acronym).
+            Keep spoken voice answers under 1-2 sentences. Never reply with verbose paragraphs or raw markdown.
+            Understand multilingual phrases in English, Hindi, and Hinglish (e.g., 'Mummy ko call karo', 'Papa ko phone lagao', 'Silent mode on karo', 'Ye note save karo').
+            When a user requests one or multiple device actions (e.g. 'Set alarm for 7, turn on torch'), invoke all relevant function calls simultaneously.
+
+            Key Action Guidelines:
+            - When asked to schedule an SMS, or write/send a greeting/wish (e.g. birthday wish to mom, marriage anniversary to brother, congratulations, or festival greetings) at a specific time (12 AM midnight, 5 PM, 10:30 AM):
+              Compose a sweet, emotional greeting with appropriate emojis (🎂❤️✨🙏) in the user's spoken language, and call 'schedule_sms' with contact_name, scheduled_time, and message!
+            - When asked to show photos/pictures/images of anything (e.g. 'show fortuner photos', 'iron man photos'):
+              Never say you cannot show or generate images! Call 'search_photos' with the search query!
+            - When asked for directions, road, way, or route (e.g. 'Jaipur to Delhi route', 'route to airport from current location'):
+              Call 'navigate_route' with origin and destination!
+            - When asked for shopping recommendations or best products under a budget (e.g. 'best hair dryer under 2000'):
+              Call 'product_recommendation' with a concise recommendation!
+            - When asked about user's personal details (mom's name, college time, habits, today's tasks):
+              Look up the user context below and answer accurately!
             
             Current User Lifestyle & Memory Context:
             $userContext
@@ -651,6 +672,62 @@ class GeminiClient(private val preferenceManager: PreferenceManager) {
                             put("properties", JSONObject().apply {
                                 put("festival_name", JSONObject().put("type", "string").put("description", "Optional festival name (e.g. Diwali, Holi, Raksha Bandhan)"))
                             })
+                        })
+                    })
+
+                    // Schedule SMS with emotional wishes & emojis
+                    put(JSONObject().apply {
+                        put("name", "schedule_sms")
+                        put("description", "Schedule an SMS to a contact with a message or auto-generated wishes with emojis (e.g. at 12 AM midnight, 5 PM, 2 AM, 10:30 AM)")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("contact_name", JSONObject().put("type", "string").put("description", "Recipient contact name or relationship (e.g. Mummy, Rahul, Friend)"))
+                                put("scheduled_time", JSONObject().put("type", "string").put("description", "Desired time e.g. '12:00 AM', '5:00 PM', 'tomorrow 10:30 AM', 'night 2 am'"))
+                                put("message", JSONObject().put("type", "string").put("description", "The SMS body including heartwarming wishes and emojis if applicable"))
+                            })
+                            put("required", JSONArray().put("contact_name").put("scheduled_time").put("message"))
+                        })
+                    })
+
+                    // Search Photos
+                    put(JSONObject().apply {
+                        put("name", "search_photos")
+                        put("description", "Search and display photos or images of cars, celebrities, objects, or places")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("query", JSONObject().put("type", "string").put("description", "Search query for photos (e.g. Fortuner, Iron Man, Aeroplane)"))
+                            })
+                            put("required", JSONArray().put("query"))
+                        })
+                    })
+
+                    // Navigate Route
+                    put(JSONObject().apply {
+                        put("name", "navigate_route")
+                        put("description", "Open Google Maps navigation to show the best route from an origin to destination or from live location")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("destination", JSONObject().put("type", "string").put("description", "Destination city, place, or address (e.g. Delhi, Airport)"))
+                                put("origin", JSONObject().put("type", "string").put("description", "Starting location (e.g. Jaipur) or leave empty for current live location"))
+                            })
+                            put("required", JSONArray().put("destination"))
+                        })
+                    })
+
+                    // Shopping Product Recommendation
+                    put(JSONObject().apply {
+                        put("name", "product_recommendation")
+                        put("description", "Recommend top budget products with direct store buy links")
+                        put("parameters", JSONObject().apply {
+                            put("type", "object")
+                            put("properties", JSONObject().apply {
+                                put("query", JSONObject().put("type", "string").put("description", "Product query (e.g. hair dryer under 2000 rupees)"))
+                                put("recommendation", JSONObject().put("type", "string").put("description", "1-2 sentence recommendation of top models"))
+                            })
+                            put("required", JSONArray().put("query"))
                         })
                     })
                 })

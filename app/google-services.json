@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "309741886520",
+    "project_id": "aaya-2030",
+    "storage_bucket": "aaya-2030.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309741886520:android:849f3ba005393808a8dacd",
+        "android_client_info": {
+          "package_name": "com.aaya.assistant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGxHILtwIrbBMaaw1Q5YgJgD4YCAH1rmc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

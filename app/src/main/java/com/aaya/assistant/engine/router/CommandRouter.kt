@@ -205,7 +205,172 @@ class CommandRouter(
             }
         }
 
-        // 5. FAST LOCAL ROUTE: Settings & Connectivity (100% Offline)
+        // 5. FAST LOCAL ROUTE: Volume Controls (Checked BEFORE generic settings)
+        if (lower.contains("volume up") || lower.contains("awaz badhao") || lower.contains("aawaz badhao") || lower.contains("volume badhao") || lower.contains("volume badha do") || lower.contains("sound up")) {
+            deviceController.adjustVolume(increase = true)
+            speak("Volume badha di gayi hai.")
+            return@withContext ExecutionResult("Volume increased.", "Volume UP", handledLocally = true)
+        }
+        if (lower.contains("volume down") || lower.contains("awaz kam karo") || lower.contains("aawaz kam karo") || lower.contains("volume kam karo") || lower.contains("volume kam kar do") || lower.contains("sound down") || lower.contains("aawaz dheemi")) {
+            deviceController.adjustVolume(increase = false)
+            speak("Volume kam kar di gayi hai.")
+            return@withContext ExecutionResult("Volume decreased.", "Volume DOWN", handledLocally = true)
+        }
+        if (lower.contains("mute") || lower.contains("awaz band") || lower.contains("volume zero")) {
+            deviceController.muteVolume()
+            speak("Volume mute kar di gayi hai.")
+            return@withContext ExecutionResult("Volume muted.", "Mute", handledLocally = true)
+        }
+        if (lower.contains("volume full") || lower.contains("volume 100") || lower.contains("awaz full")) {
+            deviceController.setVolumePercent(100)
+            speak("Volume full kar di gayi hai.")
+            return@withContext ExecutionResult("Volume set to 100%.", "Volume MAX", handledLocally = true)
+        }
+        val volumePercentMatch = "(?i)(?:volume|sound|awaz|aawaz)\\s*(?:ko|to)?\\s*(\\d{1,3})\\s*(?:%|percent)?".toRegex().find(query)
+        if (volumePercentMatch != null) {
+            val pct = volumePercentMatch.groupValues[1].toIntOrNull() ?: 50
+            deviceController.setVolumePercent(pct)
+            speak("Volume $pct% par set kar di hai.")
+            return@withContext ExecutionResult("Volume set to $pct%.", "Volume $pct%", handledLocally = true)
+        }
+
+        // 5B. FAST LOCAL ROUTE: Screen Brightness Controls (Checked BEFORE generic settings)
+        if (lower.contains("brightness up") || lower.contains("brightness badhao") || lower.contains("brightness badha do") || lower.contains("roshni badhao")) {
+            val success = deviceController.adjustBrightness(increase = true)
+            val msg = if (success) "Brightness badha di gayi hai." else "Please allow Write System Settings permission to adjust brightness."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Brightness UP", handledLocally = true)
+        }
+        if (lower.contains("brightness down") || lower.contains("brightness kam karo") || lower.contains("brightness kam kar do") || lower.contains("roshni kam karo")) {
+            val success = deviceController.adjustBrightness(increase = false)
+            val msg = if (success) "Brightness kam kar di gayi hai." else "Please allow Write System Settings permission to adjust brightness."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Brightness DOWN", handledLocally = true)
+        }
+        if (lower.contains("brightness full") || lower.contains("brightness 100") || lower.contains("full brightness") || lower.contains("roshni full")) {
+            val success = deviceController.setBrightness(100)
+            val msg = if (success) "Brightness full 100% kar di hai." else "Please allow Write System Settings permission to adjust brightness."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Brightness MAX", handledLocally = true)
+        }
+        val brightnessPercentMatch = "(?i)(?:brightness|roshni|screen)\\s*(?:ko|to)?\\s*(\\d{1,3})\\s*(?:%|percent)?".toRegex().find(query)
+        if (brightnessPercentMatch != null) {
+            val pct = brightnessPercentMatch.groupValues[1].toIntOrNull() ?: 50
+            val success = deviceController.setBrightness(pct)
+            val msg = if (success) "Brightness $pct% par set kar di hai." else "Please allow Write System Settings permission to adjust brightness."
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Brightness $pct%", handledLocally = true)
+        }
+
+        // 5C. FAST LOCAL ROUTE: Visual Photo Search (Google Images Intent)
+        if (lower.contains("photo") || lower.contains("photos") || lower.contains("tasveer") || lower.contains("pictures") || lower.contains("images")) {
+            val subject = lower
+                .replace("(?i)(show me|show|dikhao|photos of|photo of|images of|pictures of|photos|photo|tasveer|image|images|ki photo|ki tasveer)".toRegex(), "")
+                .trim()
+            if (subject.isNotBlank()) {
+                val uri = android.net.Uri.parse("https://www.google.com/search?tbm=isch&q=${android.net.Uri.encode(subject)}")
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+                val msg = "Showing photos of $subject."
+                speak(msg)
+                logAudit("PHOTOS", "Search photos: $subject")
+                return@withContext ExecutionResult(msg, "Photos: $subject", handledLocally = true)
+            }
+        }
+
+        // 5D. FAST LOCAL ROUTE: Maps Turn-by-Turn Route Navigation
+        if (lower.contains("route") || lower.contains("rasta") || lower.contains("directions") || lower.contains("raasta")) {
+            val cleanRoute = lower
+                .replace("(?i)(tell me the best way or root for|tell me the best way or route for|best route for|best route from|route for|route from|rasta batao|ka rasta|ka route|navigation to|navigate to)".toRegex(), "")
+                .trim()
+
+            val (origin, destination) = if (cleanRoute.contains(" to ")) {
+                val pts = cleanRoute.split(" to ")
+                Pair(pts[0].trim(), pts.getOrElse(1) { "" }.trim())
+            } else if (cleanRoute.contains(" se ")) {
+                val pts = cleanRoute.split(" se ")
+                Pair(pts[0].trim(), pts.getOrElse(1) { "" }.replace(" tak", "").trim())
+            } else {
+                Pair("", cleanRoute)
+            }
+
+            if (destination.isNotBlank()) {
+                val uri = if (origin.isBlank()) {
+                    android.net.Uri.parse("google.navigation:q=${android.net.Uri.encode(destination)}")
+                } else {
+                    android.net.Uri.parse("https://www.google.com/maps/dir/?api=1&origin=${android.net.Uri.encode(origin)}&destination=${android.net.Uri.encode(destination)}&travelmode=driving")
+                }
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    setPackage("com.google.android.apps.maps")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                try {
+                    context.startActivity(intent)
+                } catch (_: Exception) {
+                    val browserIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(browserIntent)
+                }
+                val msg = if (origin.isBlank()) "Showing route to $destination on Google Maps." else "Showing route from $origin to $destination on Google Maps."
+                speak(msg)
+                logAudit("ROUTE", "Maps: $origin -> $destination")
+                return@withContext ExecutionResult(msg, "Route: $origin -> $destination", handledLocally = true)
+            }
+        }
+
+        // 5E. FAST LOCAL ROUTE: Today's Tasks & Scheduled SMS Queries
+        if (lower == "todays tasks" || lower == "today tasks" || lower == "tasks" || lower == "aaj ke tasks" || lower.contains("what are my tasks") || lower.contains("mere tasks")) {
+            val pendingTasks = db.aayaDao().getPendingScheduledTasks()
+            val msg = if (pendingTasks.isNotEmpty()) {
+                val taskDescriptions = pendingTasks.map { task ->
+                    val timeStr = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(task.triggerTimeEpochMs))
+                    "${task.title} at $timeStr"
+                }
+                "Aapke aaj ke tasks hain: " + taskDescriptions.joinToString(", ") + "."
+            } else {
+                "Aapke paas aaj ke liye koi pending tasks nahi hain."
+            }
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Today's Tasks (${pendingTasks.size})", handledLocally = true)
+        }
+
+        if (lower.contains("scheduled sms") || lower.contains("scheduled message") || lower.contains("messages scheduled") || lower.contains("kaunse message schedule")) {
+            val pendingSms = db.aayaDao().getPendingScheduledTasks().filter { it.taskType == "SEND_SCHEDULED_SMS" }
+            val msg = if (pendingSms.isEmpty()) {
+                "Aapka koi scheduled message pending nahi hai."
+            } else {
+                val list = pendingSms.map { task ->
+                    val timeStr = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(task.triggerTimeEpochMs))
+                    val parts = task.targetData.split("|||")
+                    val contact = parts.getOrNull(1) ?: "Contact"
+                    "$contact ko $timeStr baje"
+                }
+                "Aapke scheduled messages hain: " + list.joinToString(", ") + "."
+            }
+            speak(msg)
+            return@withContext ExecutionResult(msg, "Scheduled SMS (${pendingSms.size})", handledLocally = true)
+        }
+
+        if (lower.startsWith("cancel message") || lower.contains("cancel scheduled message") || lower.contains("message cancel karo") || lower.contains("sms cancel karo")) {
+            val pendingSms = db.aayaDao().getPendingScheduledTasks().filter { it.taskType == "SEND_SCHEDULED_SMS" }
+            if (pendingSms.isNotEmpty()) {
+                for (t in pendingSms) {
+                    db.aayaDao().deleteScheduledTask(t)
+                }
+                val msg = "Scheduled messages cancel kar diye gaye hain."
+                speak(msg)
+                return@withContext ExecutionResult(msg, "Cancelled scheduled messages", handledLocally = true)
+            } else {
+                val msg = "Cancel karne ke liye koi scheduled message nahi mila."
+                speak(msg)
+                return@withContext ExecutionResult(msg, "No scheduled messages to cancel", handledLocally = true)
+            }
+        }
+
+        // 6. FAST LOCAL ROUTE: Generic Settings & Connectivity (100% Offline)
         if (lower.contains("setting") || lower.contains("settings")) {
             deviceController.openSettings()
             val msg = "Opening Settings."
@@ -225,63 +390,6 @@ class CommandRouter(
             val msg = "Opening Bluetooth Settings."
             speak(msg)
             return@withContext ExecutionResult(msg, "Bluetooth Settings", handledLocally = true)
-        }
-
-        // 6. FAST LOCAL ROUTE: Volume Controls
-        if (lower.contains("volume up") || lower.contains("awaz badhao") || lower.contains("aawaz badhao") || lower.contains("volume badhao") || lower.contains("volume badha do") || lower.contains("sound up")) {
-            deviceController.adjustVolume(increase = true)
-            speak("Volume badha di gayi hai.")
-            return@withContext ExecutionResult("Volume increased.", "Volume UP", handledLocally = true)
-        }
-        if (lower.contains("volume down") || lower.contains("awaz kam karo") || lower.contains("aawaz kam karo") || lower.contains("volume kam karo") || lower.contains("volume kam kar do") || lower.contains("sound down") || lower.contains("aawaz dheemi")) {
-            deviceController.adjustVolume(increase = false)
-            speak("Volume kam kar di gayi hai.")
-            return@withContext ExecutionResult("Volume decreased.", "Volume DOWN", handledLocally = true)
-        }
-        if (lower.contains("mute") || lower.contains("awaz band") || lower.contains("volume zero")) {
-            deviceController.muteVolume()
-            speak("Volume mute kar di gayi hai.")
-            return@withContext ExecutionResult("Volume muted.", "Mute", handledLocally = true)
-        }
-        if (lower.contains("volume full") || lower.contains("volume 100")) {
-            deviceController.setVolumePercent(100)
-            speak("Volume full kar di gayi hai.")
-            return@withContext ExecutionResult("Volume set to 100%.", "Volume MAX", handledLocally = true)
-        }
-        val volumePercentMatch = "(?i)volume\\s+(\\d{1,3})\\s*%?".toRegex().find(query)
-        if (volumePercentMatch != null) {
-            val pct = volumePercentMatch.groupValues[1].toIntOrNull() ?: 50
-            deviceController.setVolumePercent(pct)
-            speak("Volume $pct% par set kar di hai.")
-            return@withContext ExecutionResult("Volume set to $pct%.", "Volume $pct%", handledLocally = true)
-        }
-
-        // 6B. FAST LOCAL ROUTE: Screen Brightness Controls
-        if (lower.contains("brightness up") || lower.contains("brightness badhao") || lower.contains("brightness badha do") || lower.contains("roshni badhao")) {
-            val success = deviceController.adjustBrightness(increase = true)
-            val msg = if (success) "Brightness badha di gayi hai." else "Please allow Write System Settings permission to adjust brightness."
-            speak(msg)
-            return@withContext ExecutionResult(msg, "Brightness UP", handledLocally = true)
-        }
-        if (lower.contains("brightness down") || lower.contains("brightness kam karo") || lower.contains("brightness kam kar do") || lower.contains("roshni kam karo")) {
-            val success = deviceController.adjustBrightness(increase = false)
-            val msg = if (success) "Brightness kam kar di gayi hai." else "Please allow Write System Settings permission to adjust brightness."
-            speak(msg)
-            return@withContext ExecutionResult(msg, "Brightness DOWN", handledLocally = true)
-        }
-        if (lower.contains("brightness full") || lower.contains("brightness 100")) {
-            val success = deviceController.setBrightness(100)
-            val msg = if (success) "Brightness full 100% kar di hai." else "Please allow Write System Settings permission to adjust brightness."
-            speak(msg)
-            return@withContext ExecutionResult(msg, "Brightness MAX", handledLocally = true)
-        }
-        val brightnessPercentMatch = "(?i)brightness\\s+(\\d{1,3})\\s*%?".toRegex().find(query)
-        if (brightnessPercentMatch != null) {
-            val pct = brightnessPercentMatch.groupValues[1].toIntOrNull() ?: 50
-            val success = deviceController.setBrightness(pct)
-            val msg = if (success) "Brightness $pct% par set kar di hai." else "Please allow Write System Settings permission to adjust brightness."
-            speak(msg)
-            return@withContext ExecutionResult(msg, "Brightness $pct%", handledLocally = true)
         }
 
         // 7. FAST LOCAL ROUTE: Permission-Aware Calling & Multilingual Contact Match
@@ -717,12 +825,28 @@ class CommandRouter(
         }
 
         // 26. COMPLEX / AI ROUTE: Forward to Gemini 3.6 Flash AI Brain with Multi-Action Tool Calling
-        val userMemories = try {
-            db.aayaDao().getMemoryByCategory("routine")
+        val allMemories = try {
+            db.aayaDao().getAllMemoryList()
         } catch (e: Exception) {
             emptyList()
         }
-        val contextSummary = userMemories.joinToString("; ") { "${it.key}: ${it.value}" }
+        val pendingTasks = try {
+            db.aayaDao().getPendingScheduledTasks()
+        } catch (e: Exception) {
+            emptyList()
+        }
+        val contextSummary = buildString {
+            append("User Name: ${prefs.userName}. ")
+            if (allMemories.isNotEmpty()) {
+                append("Saved Memories: " + allMemories.joinToString("; ") { "${it.key}: ${it.value}" } + ". ")
+            }
+            if (pendingTasks.isNotEmpty()) {
+                append("Upcoming Tasks: " + pendingTasks.joinToString("; ") { task ->
+                    val t = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(task.triggerTimeEpochMs))
+                    "${task.title} at $t"
+                } + ". ")
+            }
+        }
 
         when (val result = geminiClient.executeVoicePrompt(query, contextSummary)) {
             is GeminiResult.Success -> {
@@ -965,6 +1089,77 @@ class CommandRouter(
                     executedSummaries.add("Location unavailable - enable GPS")
                 }
             }
+            "schedule_sms" -> {
+                val contact = tool.args["contact_name"]?.toString() ?: ""
+                val timeStr = tool.args["scheduled_time"]?.toString() ?: "12:00 AM"
+                val message = tool.args["message"]?.toString() ?: "Hello"
+
+                val match = contactMatcher.resolveAndFindContact(contact)
+                val phone = match?.phoneNumber ?: contact
+                val displayName = match?.contactName ?: contact
+                val triggerEpochMs = parseTimeExpressionToEpoch(timeStr)
+
+                val targetData = "$phone|||$displayName|||$message"
+                val taskId = db.aayaDao().insertScheduledTask(
+                    ScheduledTask(
+                        title = "SMS to $displayName: $message",
+                        taskType = "SEND_SCHEDULED_SMS",
+                        targetData = targetData,
+                        triggerTimeEpochMs = triggerEpochMs
+                    )
+                )
+                deviceController.scheduleTaskNotification(triggerEpochMs, taskId, "SMS to $displayName", "SEND_SCHEDULED_SMS", targetData)
+                logAudit("SCHEDULED_SMS", "Scheduled SMS for $displayName at $timeStr")
+                executedSummaries.add("Scheduled message for $displayName at $timeStr")
+            }
+            "search_photos" -> {
+                val q = tool.args["query"]?.toString() ?: ""
+                if (q.isNotBlank()) {
+                    val uri = android.net.Uri.parse("https://www.google.com/search?tbm=isch&q=${android.net.Uri.encode(q)}")
+                    val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                    logAudit("PHOTOS", "Search photos: $q")
+                    executedSummaries.add("Showing photos of $q")
+                }
+            }
+            "navigate_route" -> {
+                val dest = tool.args["destination"]?.toString() ?: ""
+                val orig = tool.args["origin"]?.toString() ?: ""
+                if (dest.isNotBlank()) {
+                    val uri = if (orig.isBlank()) {
+                        android.net.Uri.parse("google.navigation:q=${android.net.Uri.encode(dest)}")
+                    } else {
+                        android.net.Uri.parse("https://www.google.com/maps/dir/?api=1&origin=${android.net.Uri.encode(orig)}&destination=${android.net.Uri.encode(dest)}&travelmode=driving")
+                    }
+                    val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                        setPackage("com.google.android.apps.maps")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    try {
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        val browserIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(browserIntent)
+                    }
+                    logAudit("ROUTE", "Directions: $orig -> $dest")
+                    executedSummaries.add("Showing route to $dest")
+                }
+            }
+            "product_recommendation" -> {
+                val q = tool.args["query"]?.toString() ?: ""
+                val rec = tool.args["recommendation"]?.toString() ?: ""
+                val uri = android.net.Uri.parse("https://www.google.com/search?tbm=shop&q=${android.net.Uri.encode(q)}")
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+                logAudit("SHOPPING", "Shopping search: $q")
+                executedSummaries.add(if (rec.isNotBlank()) rec else "Opening shopping comparison for $q")
+            }
         }
     }
 
@@ -1138,26 +1333,69 @@ class CommandRouter(
 
     private suspend fun searchSavedMemory(query: String): String? {
         val lower = query.lowercase(Locale.ROOT)
-        val searchTerm = when {
-            lower.contains("dawai") || lower.contains("medicine") || lower.contains("goli") -> "medicine"
-            lower.contains("timetable") || lower.contains("schedule") || lower.contains("class") -> "timetable"
-            lower.contains("papa") || lower.contains("father") || lower.contains("dad") -> "father"
-            lower.contains("mummy") || lower.contains("mother") || lower.contains("mom") || lower.contains("maa") -> "mother"
-            else -> query.replace("(?i)(mera|meri|mere|kya hai|batao|what is|tell me|my)".toRegex(), "").trim()
+
+        // 1. Task check: "todays tasks", "today tasks", "aaj ke tasks", "what are my tasks"
+        if (lower.contains("task") || lower.contains("tasks") || lower.contains("to do") || lower.contains("todo") || lower.contains("aaj ka kaam")) {
+            val pendingTasks = db.aayaDao().getPendingScheduledTasks()
+            if (pendingTasks.isNotEmpty()) {
+                val taskDescriptions = pendingTasks.map { task ->
+                    val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(task.triggerTimeEpochMs))
+                    "${task.title} ($timeStr par)"
+                }
+                return "Aapke aaj ke tasks hain: " + taskDescriptions.joinToString(", ") + "."
+            } else {
+                return "Aapke paas aaj ke liye koi pending task nahi hai."
+            }
         }
 
-        if (searchTerm.isBlank()) return null
+        // 2. Multi-Synonym Token Groups
+        val synonymLists: List<List<String>> = listOf(
+            listOf("mother", "mom", "mummy", "maa", "mataji"),
+            listOf("father", "dad", "papa", "pitaji"),
+            listOf("college", "collage", "university", "school", "class", "timetable", "schedule"),
+            listOf("medicine", "dawai", "goli", "tablet"),
+            listOf("brother", "bhai", "bhaiya"),
+            listOf("sister", "behen", "didi")
+        )
 
-        val results = db.aayaDao().searchMemory(searchTerm)
-        if (results.isNotEmpty()) {
-            val item = results.first()
-            return "Aapka ${item.key} hai: ${item.value}"
+        val searchKeywords = mutableListOf<String>()
+        for (group in synonymLists) {
+            if (group.any { lower.contains(it) }) {
+                searchKeywords.addAll(group)
+                break
+            }
         }
 
-        val notes = db.aayaDao().searchNotes(searchTerm)
-        if (notes.isNotEmpty()) {
-            val note = notes.first()
-            return "Aapke notes me mila: ${note.title} - ${note.content}"
+        if (searchKeywords.isEmpty()) {
+            val cleaned = query.replace("(?i)(mera|meri|mere|kya hai|batao|what is|tell me|my|details|information)".toRegex(), "").trim()
+            if (cleaned.isNotBlank()) {
+                searchKeywords.add(cleaned)
+                if (cleaned.contains("collage")) searchKeywords.add(cleaned.replace("collage", "college"))
+                if (cleaned.contains("college")) searchKeywords.add(cleaned.replace("college", "collage"))
+            }
+        }
+
+        for (kw in searchKeywords) {
+            val results = db.aayaDao().searchMemory(kw)
+            if (results.isNotEmpty()) {
+                val item = results.first()
+                return "Aapka ${item.key} hai: ${item.value}"
+            }
+
+            val notes = db.aayaDao().searchNotes(kw)
+            if (notes.isNotEmpty()) {
+                val note = notes.first()
+                return "Aapke notes me mila: ${note.title} - ${note.content}"
+            }
+        }
+
+        // 3. Fallback: Check if any stored memory key matches words in user's query
+        val allMemories = db.aayaDao().getAllMemoryList()
+        for (mem in allMemories) {
+            val kLower = mem.key.lowercase(Locale.ROOT)
+            if (lower.contains(kLower) || kLower.split(" ").all { lower.contains(it) }) {
+                return "Aapka ${mem.key} hai: ${mem.value}"
+            }
         }
 
         return null

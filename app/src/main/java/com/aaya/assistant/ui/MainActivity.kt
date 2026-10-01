@@ -111,18 +111,22 @@ class MainActivity : ComponentActivity() {
 
         commandRouter = CommandRouter(this, ttsManager, geminiClient, contactMatcher)
 
-        // Start background shake detector service if enabled
+        // Start background shake detector service if enabled and setup complete
         try {
-            if (prefs.isShakeEnabled) {
+            if (prefs.isShakeEnabled && prefs.isInitialSetupDone) {
                 ShakeDetectorService.start(this)
             }
         } catch (t: Throwable) {
             // Safeguarded against Android 14 FGS restrictions
         }
 
-        // Start background wake-word listening service if enabled
+        // Start background wake-word listening service if enabled, setup done, and mic permission granted
         try {
-            if (prefs.isWakeWordEnabled) {
+            val hasMic = androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.RECORD_AUDIO
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (prefs.isWakeWordEnabled && prefs.isInitialSetupDone && hasMic) {
                 com.aaya.assistant.engine.service.WakeWordForegroundService.start(this)
             }
         } catch (t: Throwable) {
@@ -231,9 +235,29 @@ fun MainAppScaffold(
     onDismissVoiceSheet: () -> Unit
 ) {
     val app = AayaApplication.instance
+    var showLoginScreen by remember { mutableStateOf(!app.preferenceManager.isLoggedIn && !app.preferenceManager.isGuestUser) }
     val initialNav = if (!app.preferenceManager.isInitialSetupDone) 3 else 0
     var currentNavIndex by remember { mutableIntStateOf(initialNav) }
     val scope = rememberCoroutineScope()
+
+    if (showLoginScreen) {
+        com.aaya.assistant.ui.auth.LoginScreen(
+            userManager = app.firebaseUserManager,
+            onContinue = {
+                showLoginScreen = false
+            }
+        )
+        return
+    }
+
+    if (app.preferenceManager.isUserBlocked) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("⚠️ Account Suspended", color = ErrorRed, fontWeight = FontWeight.Bold) },
+            text = { Text(app.preferenceManager.userBlockedReason.ifBlank { "Your account has been temporarily disabled by the administrator. Please contact support." }, color = TextPrimary) },
+            confirmButton = {}
+        )
+    }
 
     androidx.activity.compose.BackHandler(enabled = showVoiceSheet || currentNavIndex != 0) {
         if (showVoiceSheet) {

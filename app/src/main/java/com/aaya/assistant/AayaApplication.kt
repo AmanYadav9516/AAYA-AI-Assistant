@@ -31,6 +31,9 @@ class AayaApplication : Application() {
     lateinit var voiceSessionManager: com.aaya.assistant.engine.session.VoiceSessionManager
         private set
 
+    lateinit var firebaseUserManager: com.aaya.assistant.data.remote.FirebaseUserManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -43,6 +46,13 @@ class AayaApplication : Application() {
 
         try {
             database = AayaDatabase.getInstance(this)
+        } catch (t: Throwable) {
+            // Safeguarded
+        }
+
+        try {
+            firebaseUserManager = com.aaya.assistant.data.remote.FirebaseUserManager(this)
+            firebaseUserManager.initialize()
         } catch (t: Throwable) {
             // Safeguarded
         }

@@ -141,32 +141,42 @@ fun PermissionWizardScreen(onAllGranted: () -> Unit) {
             }
         }
 
-        // Bottom status banner
-        if (allGranted) {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = GlassSurface),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
-                    .border(1.dp, SuccessGreen, RoundedCornerShape(16.dp))
+        // Bottom status banner & proceed action
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = GlassSurface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+                .border(1.dp, if (allGranted) SuccessGreen else CardBorder, RoundedCornerShape(16.dp))
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Icon(
+                    imageVector = if (allGranted) Icons.Default.CheckCircle else Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = if (allGranted) SuccessGreen else NeonCyan
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (allGranted) "All Permissions Ready!" else "Ready to Explore AAYA",
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = if (allGranted) "AAYA is fully operational." else "Optional permissions can be enabled anytime in Settings.",
+                        fontSize = 11.sp,
+                        color = TextSecondary
+                    )
+                }
+                Button(
+                    onClick = onAllGranted,
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan)
                 ) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreen)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("All Permissions Ready!", fontWeight = FontWeight.Bold, color = TextPrimary)
-                        Text("AAYA is fully operational and ready to assist you.", fontSize = 12.sp, color = TextSecondary)
-                    }
-                    Button(
-                        onClick = onAllGranted,
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan)
-                    ) {
-                        Text("Start", color = DeepIndigoBg, fontWeight = FontWeight.Bold)
-                    }
+                    Text("Start", color = DeepIndigoBg, fontWeight = FontWeight.Bold)
                 }
             }
         }

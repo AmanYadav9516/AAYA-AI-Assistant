@@ -1,5 +1,6 @@
 package com.aaya.assistant.engine.service
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,9 +8,11 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.aaya.assistant.AayaApplication
 import com.aaya.assistant.engine.session.TriggerSource
 import com.aaya.assistant.ui.MainActivity
@@ -20,7 +23,23 @@ class WakeWordForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildForegroundNotification())
+
+        // Bulletproof Android 14 guard: Do not attempt startForeground with type microphone if unpermitted
+        val hasMicPermission = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasMicPermission) {
+            stopSelf()
+            return
+        }
+
+        try {
+            startForeground(NOTIFICATION_ID, buildForegroundNotification())
+        } catch (t: Throwable) {
+            stopSelf()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -98,19 +117,34 @@ class WakeWordForegroundService : Service() {
         const val ACTION_WAKE_AAYA = "com.aaya.assistant.ACTION_WAKE_AAYA"
 
         fun start(context: Context) {
-            val intent = Intent(context, WakeWordForegroundService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            val hasMicPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (!hasMicPermission) return
+
+            try {
+                val intent = Intent(context, WakeWordForegroundService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (t: Throwable) {
+                // Safeguard against Android 14 FGS restrictions
             }
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, WakeWordForegroundService::class.java).apply {
-                action = ACTION_STOP_SERVICE
+            try {
+                val intent = Intent(context, WakeWordForegroundService::class.java).apply {
+                    action = ACTION_STOP_SERVICE
+                }
+                context.startService(intent)
+            } catch (t: Throwable) {
+                // Safeguarded
             }
-            context.startService(intent)
         }
     }
 }

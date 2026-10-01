@@ -145,6 +145,34 @@ class PreferenceManager(context: Context) {
         get() = securePrefs.getBoolean(KEY_BLUETOOTH_WAKE, true)
         set(value) = securePrefs.edit().putBoolean(KEY_BLUETOOTH_WAKE, value).apply()
 
+    var isLoggedIn: Boolean
+        get() = securePrefs.getBoolean(KEY_IS_LOGGED_IN, false)
+        set(value) = securePrefs.edit().putBoolean(KEY_IS_LOGGED_IN, value).apply()
+
+    var isGuestUser: Boolean
+        get() = securePrefs.getBoolean(KEY_IS_GUEST, false)
+        set(value) = securePrefs.edit().putBoolean(KEY_IS_GUEST, value).apply()
+
+    var userEmail: String
+        get() = securePrefs.getString(KEY_USER_EMAIL, "") ?: ""
+        set(value) = securePrefs.edit().putString(KEY_USER_EMAIL, value).apply()
+
+    var userPhotoUrl: String
+        get() = securePrefs.getString(KEY_USER_PHOTO, "") ?: ""
+        set(value) = securePrefs.edit().putString(KEY_USER_PHOTO, value).apply()
+
+    var userUid: String
+        get() = securePrefs.getString(KEY_USER_UID, "") ?: ""
+        set(value) = securePrefs.edit().putString(KEY_USER_UID, value).apply()
+
+    var isUserBlocked: Boolean
+        get() = securePrefs.getBoolean(KEY_IS_BLOCKED, false)
+        set(value) = securePrefs.edit().putBoolean(KEY_IS_BLOCKED, value).apply()
+
+    var userBlockedReason: String
+        get() = securePrefs.getString(KEY_BLOCKED_REASON, "") ?: ""
+        set(value) = securePrefs.edit().putString(KEY_BLOCKED_REASON, value).apply()
+
     companion object {
         private const val KEY_API_KEY = "gemini_api_key"
         private const val KEY_ASSISTANT_NAME = "assistant_name"
@@ -179,5 +207,13 @@ class PreferenceManager(context: Context) {
         private const val KEY_NOTIFICATION_WAKE = "notification_wake_enabled"
         private const val KEY_TILE_WAKE = "tile_wake_enabled"
         private const val KEY_BLUETOOTH_WAKE = "bluetooth_wake_enabled"
+
+        private const val KEY_IS_LOGGED_IN = "is_logged_in"
+        private const val KEY_IS_GUEST = "is_guest_user"
+        private const val KEY_USER_EMAIL = "user_email"
+        private const val KEY_USER_PHOTO = "user_photo_url"
+        private const val KEY_USER_UID = "user_uid"
+        private const val KEY_IS_BLOCKED = "is_user_blocked"
+        private const val KEY_BLOCKED_REASON = "user_blocked_reason"
     }
 }

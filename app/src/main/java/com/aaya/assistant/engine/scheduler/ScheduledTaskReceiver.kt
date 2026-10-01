@@ -97,9 +97,43 @@ class ScheduledTaskReceiver : BroadcastReceiver() {
                     notifBuilder.addAction(android.R.drawable.ic_menu_call, "Call Now", callPending)
                 }
             }
+            "SEND_SCHEDULED_SMS" -> {
+                val parts = targetData.split("|||")
+                val phone = parts.getOrNull(0) ?: ""
+                val contactName = parts.getOrNull(1) ?: "Contact"
+                val messageText = parts.getOrNull(2) ?: title
+
+                var sendSuccess = false
+                if (phone.isNotBlank() && messageText.isNotBlank()) {
+                    try {
+                        val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            context.getSystemService(android.telephony.SmsManager::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            android.telephony.SmsManager.getDefault()
+                        }
+                        val divided = smsManager.divideMessage(messageText)
+                        smsManager.sendMultipartTextMessage(phone, null, divided, null, null)
+                        sendSuccess = true
+                    } catch (e: Exception) {
+                        sendSuccess = false
+                    }
+                }
+
+                val timeStr = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date())
+                if (sendSuccess) {
+                    notifBuilder.setContentTitle("✅ Scheduled SMS Sent to $contactName")
+                        .setContentText("Delivered at $timeStr: \"$messageText\"")
+                        .setStyle(NotificationCompat.BigTextStyle().bigText("Delivered to $contactName ($phone) at $timeStr:\n\n\"$messageText\""))
+                    (context.applicationContext as? AayaApplication)?.ttsManager?.speak("Aapka scheduled message $contactName ko bhej diya gaya hai.")
+                } else {
+                    notifBuilder.setContentTitle("⚠️ SMS Delivery Failed: $contactName")
+                        .setContentText("Could not deliver scheduled message to $contactName ($phone). Please check SMS permissions.")
+                }
+            }
             "STUDY_REMINDER" -> {
                 notifBuilder.setContentTitle("📚 Study Session Reminder")
-                    .setContentText(title)
+                notifBuilder.setContentText(title)
             }
             else -> {
                 notifBuilder.setContentTitle("🔔 AAYA Reminder")

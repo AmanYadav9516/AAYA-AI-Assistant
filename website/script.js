@@ -87,7 +87,7 @@ function initDownloadToasts() {
 
   downloadBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
-      showCyberToast('⚡ Initiating AAYA v3.3.0 Download! Open file after download to install.');
+      showCyberToast('⚡ Initiating AAYA v3.4.0 Download! Open file after download to install.');
     });
   });
 }

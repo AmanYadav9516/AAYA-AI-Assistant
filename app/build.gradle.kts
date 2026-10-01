@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -13,8 +14,8 @@ android {
         applicationId = "com.aaya.assistant"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "3.3.0"
+        versionCode = 10
+        versionName = "3.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -31,7 +32,6 @@ android {
             )
         }
         debug {
-            applicationIdSuffix = ".debug"
             isDebuggable = true
         }
     }
@@ -87,4 +87,11 @@ dependencies {
 
     // Secure Storage for API Keys
     implementation(libs.androidx.security.crypto)
+
+    // Firebase & Google Auth
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.play.services.auth)
+    implementation(libs.coil.compose)
 }
