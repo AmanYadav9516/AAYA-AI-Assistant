@@ -37,6 +37,7 @@ class CommandRouter(
 ) {
     private val deviceController = DeviceController(context)
     private val db = AayaDatabase.getInstance(context)
+    private val prefs = PreferenceManager(context)
     private val usagePoliceManager = com.aaya.assistant.engine.wellness.UsagePoliceManager(context)
 
     suspend fun routeAndExecute(rawSpokenText: String): ExecutionResult = withContext(Dispatchers.IO) {
@@ -340,7 +341,7 @@ class CommandRouter(
         }
 
         if (lower.contains("scheduled sms") || lower.contains("scheduled message") || lower.contains("messages scheduled") || lower.contains("kaunse message schedule")) {
-            val pendingSms = db.aayaDao().getPendingScheduledTasks().filter { it.taskType == "SEND_SCHEDULED_SMS" }
+            val pendingSms = db.aayaDao().getPendingScheduledTasksSync().filter { it.taskType == "SEND_SCHEDULED_SMS" }
             val msg = if (pendingSms.isEmpty()) {
                 "Aapka koi scheduled message pending nahi hai."
             } else {
@@ -357,7 +358,7 @@ class CommandRouter(
         }
 
         if (lower.startsWith("cancel message") || lower.contains("cancel scheduled message") || lower.contains("message cancel karo") || lower.contains("sms cancel karo")) {
-            val pendingSms = db.aayaDao().getPendingScheduledTasks().filter { it.taskType == "SEND_SCHEDULED_SMS" }
+            val pendingSms = db.aayaDao().getPendingScheduledTasksSync().filter { it.taskType == "SEND_SCHEDULED_SMS" }
             if (pendingSms.isNotEmpty()) {
                 for (t in pendingSms) {
                     db.aayaDao().deleteScheduledTask(t)
