@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all other documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId} {
+      // 1. READ: User can read their own profile & listen to block status
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // 2. CREATE: User can create their profile only with isBlocked = false
+      allow create: if request.auth != null && request.auth.uid == userId
+                    && request.resource.data.uid == userId
+                    && (!('isBlocked' in request.resource.data) || request.resource.data.isBlocked == false);
+
+      // 3. UPDATE: User can update their profile ONLY IF not blocked,
+      //    and CANNOT tamper with 'isBlocked' or 'blockedReason'
+      allow update: if request.auth != null && request.auth.uid == userId
+                    && resource.data.isBlocked != true
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isBlocked', 'blockedReason']));
+
+      // 4. DELETE: Client deletion disabled to prevent ban evasion
+      allow delete: if false;
+    }
+  }
+}
