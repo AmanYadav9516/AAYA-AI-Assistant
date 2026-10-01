@@ -1,6 +1,8 @@
 package com.aaya.assistant.engine.router
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import com.aaya.assistant.data.local.AayaDatabase
 import com.aaya.assistant.data.local.PreferenceManager
 import com.aaya.assistant.data.local.QuoteLibrary
@@ -323,7 +325,7 @@ class CommandRouter(
 
         // 5E. FAST LOCAL ROUTE: Today's Tasks & Scheduled SMS Queries
         if (lower == "todays tasks" || lower == "today tasks" || lower == "tasks" || lower == "aaj ke tasks" || lower.contains("what are my tasks") || lower.contains("mere tasks")) {
-            val pendingTasks = db.aayaDao().getPendingScheduledTasks()
+            val pendingTasks = db.aayaDao().getPendingScheduledTasksSync()
             val msg = if (pendingTasks.isNotEmpty()) {
                 val taskDescriptions = pendingTasks.map { task ->
                     val timeStr = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(task.triggerTimeEpochMs))
@@ -831,7 +833,7 @@ class CommandRouter(
             emptyList()
         }
         val pendingTasks = try {
-            db.aayaDao().getPendingScheduledTasks()
+            db.aayaDao().getPendingScheduledTasksSync()
         } catch (e: Exception) {
             emptyList()
         }
@@ -1336,7 +1338,7 @@ class CommandRouter(
 
         // 1. Task check: "todays tasks", "today tasks", "aaj ke tasks", "what are my tasks"
         if (lower.contains("task") || lower.contains("tasks") || lower.contains("to do") || lower.contains("todo") || lower.contains("aaj ka kaam")) {
-            val pendingTasks = db.aayaDao().getPendingScheduledTasks()
+            val pendingTasks = db.aayaDao().getPendingScheduledTasksSync()
             if (pendingTasks.isNotEmpty()) {
                 val taskDescriptions = pendingTasks.map { task ->
                     val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(task.triggerTimeEpochMs))

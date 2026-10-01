@@ -29,11 +29,14 @@ jobs:
       - name: Grant Execute Permission to Gradlew
         run: chmod +x gradlew
 
-      - name: Print Keystore SHA-1 Fingerprints for Firebase
-        run: ./gradlew signingReport || true
-
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
+
+      - name: Print Keystore SHA-1 & SHA-256 Fingerprints for Firebase
+        run: |
+          echo "=== APK CERTIFICATE FINGERPRINTS FOR FIREBASE ==="
+          keytool -printcert -jarfile app/build/outputs/apk/debug/app-debug.apk || true
+          ./gradlew signingReport || true
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
