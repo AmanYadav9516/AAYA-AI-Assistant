@@ -29,8 +29,10 @@ jobs:
       - name: Grant Execute Permission to Gradlew
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build Debug APK & App Bundle (AAB)
+        run: |
+          ./gradlew assembleDebug --stacktrace
+          ./gradlew bundleDebug --stacktrace
 
       - name: Print Keystore SHA-1 & SHA-256 Fingerprints for Firebase
         run: |
@@ -45,8 +47,17 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
+      - name: Upload Debug AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAYA-AI-Assistant-App-Bundle
+          path: app/build/outputs/bundle/debug/app-debug.aab
+          retention-days: 30
+
       - name: Create ZIP archive of APK
-        run: zip -j AAYA-Assistant.zip app/build/outputs/apk/debug/app-debug.apk
+        run: |
+          zip -j AAYA-Assistant.zip app/build/outputs/apk/debug/app-debug.apk
+          cp app/build/outputs/bundle/debug/app-debug.aab ./AAYA-Assistant.aab
 
       - name: Create GitHub Release with Direct APK and ZIP Downloads
         if: github.ref == 'refs/heads/main'
@@ -58,6 +69,7 @@ jobs:
 
           ### 📲 Direct 1-Click Download Links:
           * **[Download AAYA v3.4.0 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.4.0/app-debug.apk)**
+          * **[Download AAYA v3.4.0 AAB (Google Play Store Bundle)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.4.0/AAYA-Assistant.aab)**
           * **[Download AAYA v3.4.0 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.4.0/AAYA-Assistant.zip)**
 
           ### 🚀 What's New in v3.4.0:
@@ -75,6 +87,7 @@ jobs:
           gh release delete v3.4.0 --yes || true
           gh release create v3.4.0 \
             app/build/outputs/apk/debug/app-debug.apk \
+            AAYA-Assistant.aab \
             AAYA-Assistant.zip \
-            --title "AAYA AI Assistant v3.4.0 APK (3D Visual Identity, Scheduled SMS & $0 Backend)" \
+            --title "AAYA AI Assistant v3.4.0 APK & AAB (3D Visual Identity, Scheduled SMS & $0 Backend)" \
             --notes-file release_notes.md

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — AAYA AI Assistant</title>
+  <meta name="description" content="Official Privacy Policy and Data Safety Disclosures for AAYA AI Voice Assistant.">
+  <link rel="icon" type="image/jpeg" href="./assets/aaya-logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <style>
+    .privacy-container {
+      max-width: 900px;
+      margin: 120px auto 60px;
+      padding: 40px;
+      background: rgba(14, 20, 44, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 242, 254, 0.2);
+      border-radius: 20px;
+      color: #cbd5e1;
+      line-height: 1.8;
+    }
+    .privacy-container h1 {
+      font-size: 2.4rem;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+    .privacy-container h2 {
+      font-size: 1.4rem;
+      color: #00f2fe;
+      margin-top: 32px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(0, 242, 254, 0.15);
+      padding-bottom: 8px;
+    }
+    .privacy-container p, .privacy-container li {
+      font-size: 1rem;
+      color: #94a3b8;
+    }
+    .privacy-container ul {
+      padding-left: 24px;
+      margin-bottom: 16px;
+    }
+    .privacy-container li {
+      margin-bottom: 8px;
+    }
+    .badge-updated {
+      display: inline-block;
+      padding: 4px 12px;
+      background: rgba(0, 255, 135, 0.1);
+      border: 1px solid #00ff87;
+      color: #00ff87;
+      font-size: 0.85rem;
+      border-radius: 999px;
+      margin-bottom: 20px;
+    }
+    .perm-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+    }
+    .perm-title {
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body class="cyber-bg">
+
+  <!-- Ambient Glow -->
+  <div class="ambient-glow glow-cyan"></div>
+  <div class="ambient-glow glow-purple"></div>
+
+  <!-- Cyber Navigation -->
+  <header class="cyber-nav">
+    <div class="nav-container">
+      <div class="brand">
+        <a href="./index.html" style="display:flex; align-items:center; gap:12px; text-decoration:none;">
+          <div class="logo-wrapper">
+            <img src="./assets/aaya-logo.jpg" alt="AAYA Logo" class="brand-logo">
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">AAYA</span>
+            <span class="version-badge">v3.4.0</span>
+          </div>
+        </a>
+      </div>
+      <nav class="nav-links">
+        <a href="./index.html#features">Features</a>
+        <a href="./index.html#download" class="nav-cta-btn">Back to Home</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="privacy-container">
+    <span class="badge-updated">Last Updated: October 2026</span>
+    <h1>Privacy Policy & Data Safety</h1>
+    <p>Welcome to <strong>AAYA AI Assistant</strong> ("we", "our", or "us"). This Privacy Policy outlines how your personal data and permissions are handled when using our Android application and services. We are firmly committed to user privacy, offline-first processing, and transparency.</p>
+
+    <h2>1. Overview & Privacy Principles</h2>
+    <ul>
+      <li><strong>No Selling of Data:</strong> We do not sell, rent, or monetize your personal information or contact details to third-party ad networks or brokers.</li>
+      <li><strong>Offline-First Speed:</strong> Core hardware controls (flashlight, volume, brightness, offline alarms, timetable recall) are processed directly on your Android device without cloud transmission.</li>
+      <li><strong>Guest Mode Bypass:</strong> Users can use AAYA in "Guest Mode" completely offline without signing in or providing any personal identity.</li>
+    </ul>
+
+    <h2>2. Permissions Explained (Why We Request Them)</h2>
+    <p>In full compliance with Google Play Developer Policy, below is a complete and transparent breakdown of every runtime permission requested by AAYA:</p>
+
+    <div class="perm-card">
+      <div class="perm-title">🎙️ Microphone (RECORD_AUDIO & FOREGROUND_SERVICE_MICROPHONE)</div>
+      <p><strong>Purpose:</strong> Required for real-time speech recognition when you tap the mic or speak voice commands. Audio is converted to text either through on-device speech recognition or transient Google Speech APIs. We do not store, archive, or record ambient audio in the background without user initiation.</p>
+    </div>
+
+    <div class="perm-card">
+      <div class="perm-title">📖 Contacts (READ_CONTACTS)</div>
+      <p><strong>Purpose:</strong> Enables voice commands like <em>"Call Papa"</em> or <em>"Send SMS to Rahul"</em>. Contacts are matched locally on your device using bilingual phonetics. Your full contact book is never uploaded or scraped.</p>
+    </div>
+
+    <div class="perm-card">
+      <div class="perm-title">💬 SMS & Scheduled Messaging (SEND_SMS)</div>
+      <p><strong>Purpose:</strong> Allows the hands-free transmission of text messages and scheduled birthday/reminder SMS that you explicitly ask AAYA to send. SMS dispatch occurs via standard device telephony providers.</p>
+    </div>
+
+    <div class="perm-card">
+      <div class="perm-title">📍 Location (ACCESS_FINE_LOCATION & ACCESS_COARSE_LOCATION)</div>
+      <p><strong>Purpose:</strong> Used exclusively when you ask for your current postal PIN code, local weather, district info, or route navigation. Location coordinates are queried live and never tracked on external servers.</p>
+    </div>
+
+    <div class="perm-card">
+      <div class="perm-title">📞 Call Phone & Call Logs (CALL_PHONE & READ_CALL_LOG)</div>
+      <p><strong>Purpose:</strong> Allows hands-free telephone dialing and queries such as <em>"Aakhiri call kiski thi?"</em> (Who called last?). Call logs are read strictly to fulfill user-initiated verbal questions.</p>
+    </div>
+
+    <div class="perm-card">
+      <div class="perm-title">🫧 Floating Overlay (SYSTEM_ALERT_WINDOW)</div>
+      <p><strong>Purpose:</strong> Displays the Siri-style animated waveform card over existing applications so you can interact with AAYA without exiting your current app.</p>
+    </div>
+
+    <h2>3. Cloud Services & Third-Party Integration</h2>
+    <ul>
+      <li><strong>Google Firebase Authentication:</strong> If you choose Google Sign-In, Firebase securely verifies your Google account UID, email, and display name.</li>
+      <li><strong>Google Cloud Firestore:</strong> Used to securely maintain your user profile, daily query quota, and optional cloud sync across devices.</li>
+      <li><strong>Google Gemini AI API:</strong> When handling complex generative queries, text prompts are transmitted over encrypted TLS (HTTPS) connections to Google Gemini models to generate natural language answers.</li>
+    </ul>
+
+    <h2>4. Data Retention & User Rights</h2>
+    <p>You have full ownership of your data:</p>
+    <ul>
+      <li>You can clear all stored memories and local notes at any time from within the app settings.</li>
+      <li>To request full account deletion and removal of your Firebase profile, simply contact us at the email below, and your record will be purged within 48 hours.</li>
+    </ul>
+
+    <h2>5. Developer Contact</h2>
+    <p>If you have any questions, feedback, or requests regarding this Privacy Policy, please contact:</p>
+    <p><strong>Developer:</strong> Aman Yadav<br>
+    <strong>Project Repository:</strong> <a href="https://github.com/AmanYadav9516/AAYA-AI-Assistant" target="_blank" style="color:#00f2fe;">GitHub Repository</a><br>
+    <strong>Email:</strong> amanyadav9516@gmail.com</p>
+  </main>
+
+  <footer class="cyber-footer">
+    <div class="footer-container">
+      <p>© 2026 AAYA AI Assistant. Built by Aman Yadav. All rights reserved.</p>
+    </div>
+  </footer>
+
+</body>
+</html>
