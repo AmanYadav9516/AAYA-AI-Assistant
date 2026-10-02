@@ -142,7 +142,7 @@ fun UserAgreementDialog(
                     // Guarantee items
                     PrivacyItemRow(
                         icon = Icons.Default.Lock,
-                        iconTint = AccentMint,
+                        iconTint = SuccessGreen,
                         title = "Zero Data Selling",
                         desc = "Your personal information, queries, and contacts are NEVER sold or leased to third-party ad networks."
                     )
@@ -169,7 +169,7 @@ fun UserAgreementDialog(
 
                     PrivacyItemRow(
                         icon = Icons.Default.VerifiedUser,
-                        iconTint = CoralAccent,
+                        iconTint = GoldAccent,
                         title = "You Are In Total Control",
                         desc = "You can wipe stored memories, notes, and local caches anytime with a single tap in Settings."
                     )
