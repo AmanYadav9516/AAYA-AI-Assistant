@@ -236,6 +236,7 @@ fun MainAppScaffold(
 ) {
     val app = AayaApplication.instance
     var showLoginScreen by remember { mutableStateOf(!app.preferenceManager.isLoggedIn && !app.preferenceManager.isGuestUser) }
+    var showAgreementDialog by remember { mutableStateOf(!app.preferenceManager.hasAcceptedAgreement) }
     val initialNav = if (!app.preferenceManager.isInitialSetupDone) 3 else 0
     var currentNavIndex by remember { mutableIntStateOf(initialNav) }
     val scope = rememberCoroutineScope()
@@ -248,6 +249,15 @@ fun MainAppScaffold(
             }
         )
         return
+    }
+
+    if (showAgreementDialog) {
+        com.aaya.assistant.ui.onboarding.UserAgreementDialog(
+            onAccept = {
+                app.preferenceManager.hasAcceptedAgreement = true
+                showAgreementDialog = false
+            }
+        )
     }
 
     if (app.preferenceManager.isUserBlocked) {
@@ -396,7 +406,11 @@ fun MainAppScaffold(
                         currentNavIndex = 0
                     }
                 )
-                4 -> ApiSettingsScreen()
+                4 -> ApiSettingsScreen(
+                    onLogout = {
+                        showLoginScreen = true
+                    }
+                )
             }
 
             // Floating Assistant Voice Overlay Sheet

@@ -165,6 +165,26 @@ class FirebaseUserManager(private val context: Context) {
         prefs.isUserBlocked = false
     }
 
+    suspend fun updateUserProfile(name: String, age: String, dob: String, location: String) {
+        prefs.userName = name
+        prefs.userAge = age
+        prefs.userDob = dob
+        prefs.userLocation = location
+        val uid = prefs.userUid
+        if (uid.isNotBlank() && !prefs.isGuestUser) {
+            try {
+                firestore.collection("users").document(uid).update(
+                    mapOf(
+                        "displayName" to name,
+                        "age" to age,
+                        "dob" to dob,
+                        "location" to location
+                    )
+                ).await()
+            } catch (_: Exception) {}
+        }
+    }
+
     fun incrementApiRequest() {
         val uid = prefs.userUid
         if (uid.isBlank() || prefs.isGuestUser) return

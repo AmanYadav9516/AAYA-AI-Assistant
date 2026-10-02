@@ -1,9 +1,16 @@
 package com.aaya.assistant.ui.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -13,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,7 +32,9 @@ import com.aaya.assistant.ui.theme.*
 import kotlinx.coroutines.launch
 
 @Composable
-fun ApiSettingsScreen() {
+fun ApiSettingsScreen(
+    onLogout: () -> Unit = {}
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = AayaApplication.instance.preferenceManager
     val scope = rememberCoroutineScope()
@@ -34,6 +44,9 @@ fun ApiSettingsScreen() {
     var openRouterKeyInput by remember { mutableStateOf(prefs.openRouterApiKey) }
     var aiProvider by remember { mutableStateOf(prefs.aiProvider) }
     var userNameInput by remember { mutableStateOf(prefs.userName) }
+    var userAgeInput by remember { mutableStateOf(prefs.userAge) }
+    var userDobInput by remember { mutableStateOf(prefs.userDob) }
+    var userLocationInput by remember { mutableStateOf(prefs.userLocation) }
     var assistantNameInput by remember { mutableStateOf(prefs.assistantName) }
     var isShakeEnabled by remember { mutableStateOf(prefs.isShakeEnabled) }
     var shakeSensitivity by remember { mutableFloatStateOf(prefs.shakeSensitivity) }
@@ -48,6 +61,7 @@ fun ApiSettingsScreen() {
     var emergencyName by remember { mutableStateOf(prefs.emergencyContactName) }
 
     var showVoiceDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
     var isTestingConnection by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<ApiDiagnostics?>(null) }
     var profileSavedFeedback by remember { mutableStateOf(false) }
@@ -57,6 +71,43 @@ fun ApiSettingsScreen() {
         VoiceCustomizerDialog(
             ttsManager = null,
             onDismiss = { showVoiceDialog = false }
+        )
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ExitToApp, contentDescription = null, tint = ErrorRed)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Log Out of AAYA?", fontWeight = FontWeight.Bold, color = TextPrimary)
+                }
+            },
+            text = {
+                Text(
+                    "Are you sure you want to log out? Your session will be cleared. You can sign in anytime with Google or use Guest Mode.",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutDialog = false
+                        AayaApplication.instance.firebaseUserManager.signOut()
+                        Toast.makeText(context, "Logged out successfully", Toast.LENGTH_SHORT).show()
+                        onLogout()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                ) {
+                    Text("Log Out", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancel", color = TextPrimary)
+                }
+            }
         )
     }
 
@@ -87,20 +138,37 @@ fun ApiSettingsScreen() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = NeonCyan)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text("User Profile & Voice Persona", fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(NeonCyan.copy(alpha = 0.15f))
+                            .border(1.5.dp, NeonCyan, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(28.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("User Profile & Identity", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
+                        Text(
+                            text = if (prefs.isGuestUser) "Guest Mode (Offline)" else prefs.userEmail.ifBlank { "Personal Profile" },
+                            fontSize = 12.sp,
+                            color = NeonCyan
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
+                // Name
                 OutlinedTextField(
                     value = userNameInput,
                     onValueChange = {
                         userNameInput = it
-                        prefs.userName = it
                     },
-                    label = { Text("Your Name (e.g. Manish)") },
+                    label = { Text("Your Name (e.g. Aman / Rahul)") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = NeonCyan) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -110,12 +178,70 @@ fun ApiSettingsScreen() {
                     )
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Age and DOB row
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = userAgeInput,
+                        onValueChange = { userAgeInput = it },
+                        label = { Text("Age") },
+                        leadingIcon = { Icon(Icons.Default.Cake, contentDescription = null, tint = RadiantPurple) },
+                        singleLine = true,
+                        modifier = Modifier.weight(0.4f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = RadiantPurple,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextSecondary
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    OutlinedTextField(
+                        value = userDobInput,
+                        onValueChange = { userDobInput = it },
+                        label = { Text("DOB (DD/MM/YYYY)") },
+                        leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null, tint = RadiantPurple) },
+                        singleLine = true,
+                        modifier = Modifier.weight(0.6f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = RadiantPurple,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextSecondary
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Location
+                OutlinedTextField(
+                    value = userLocationInput,
+                    onValueChange = { userLocationInput = it },
+                    label = { Text("Location / City (e.g. Lucknow, India)") },
+                    leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = NeonCyan) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = NeonCyan,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextSecondary
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Button(
                     onClick = {
-                        prefs.userName = userNameInput.trim()
-                        profileSavedFeedback = true
+                        scope.launch {
+                            AayaApplication.instance.firebaseUserManager.updateUserProfile(
+                                name = userNameInput.trim(),
+                                age = userAgeInput.trim(),
+                                dob = userDobInput.trim(),
+                                location = userLocationInput.trim()
+                            )
+                            profileSavedFeedback = true
+                            Toast.makeText(context, "Profile Saved! ✅", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
                     shape = RoundedCornerShape(10.dp),
@@ -568,5 +694,165 @@ fun ApiSettingsScreen() {
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Share AAYA with Friends Card
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = GlassSurface),
+            modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Share, contentDescription = null, tint = NeonCyan)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Share AAYA with Friends & Family", fontWeight = FontWeight.Bold, color = TextPrimary)
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Spread the love! Help your family and friends experience India's smartest voice assistant.",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                val websiteUrl = "https://amanyadav9516.github.io/AAYA-AI-Assistant/"
+                val shareText = "Hey! Check out AAYA AI Assistant - India's smart voice companion with offline calling, Hindi & English voice commands, and intelligent AI! 🚀 Download now: $websiteUrl"
+
+                // WhatsApp 1-tap share
+                Button(
+                    onClick = {
+                        try {
+                            val waIntent = Intent(Intent.ACTION_VIEW).apply {
+                                data = Uri.parse("https://api.whatsapp.com/send?text=${Uri.encode(shareText)}")
+                            }
+                            context.startActivity(waIntent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "WhatsApp not installed on this device", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Send, contentDescription = "WhatsApp", tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Share on WhatsApp 💬", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // SMS Button
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val smsIntent = Intent(Intent.ACTION_SENDTO).apply {
+                                    data = Uri.parse("smsto:")
+                                    putExtra("sms_body", shareText)
+                                }
+                                context.startActivity(smsIntent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Cannot open SMS app", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan)
+                    ) {
+                        Icon(Icons.Default.Message, contentDescription = "SMS", tint = NeonCyan, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("SMS", color = NeonCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    // Copy Link Button
+                    OutlinedButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("AAYA Assistant Website", websiteUrl)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Website link copied! 📋", Toast.LENGTH_SHORT).show()
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, RadiantPurple)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Link", tint = RadiantPurple, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Copy Link", color = RadiantPurple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    // More share options
+                    OutlinedButton(
+                        onClick = {
+                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                                type = "text/plain"
+                            }
+                            val chooser = Intent.createChooser(sendIntent, "Share AAYA via")
+                            context.startActivity(chooser)
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "More", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("More", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Account & Log Out Card
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = GlassSurface),
+            modifier = Modifier.fillMaxWidth().border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AccountCircle, contentDescription = null, tint = RadiantPurple)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Account & Session", fontWeight = FontWeight.Bold, color = TextPrimary)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = when {
+                        prefs.isGuestUser -> "Logged in as: Guest User (Offline Mode)"
+                        prefs.userEmail.isNotBlank() -> "Logged in as: ${prefs.userEmail}"
+                        else -> "Status: Active Session"
+                    },
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = { showLogoutDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, ErrorRed),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.ExitToApp, contentDescription = "Log Out", tint = ErrorRed)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Log Out from AAYA", color = ErrorRed, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }

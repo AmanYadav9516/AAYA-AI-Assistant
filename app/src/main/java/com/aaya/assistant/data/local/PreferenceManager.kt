@@ -173,6 +173,22 @@ class PreferenceManager(context: Context) {
         get() = securePrefs.getString(KEY_BLOCKED_REASON, "") ?: ""
         set(value) = securePrefs.edit().putString(KEY_BLOCKED_REASON, value).apply()
 
+    var userAge: String
+        get() = securePrefs.getString(KEY_USER_AGE, "") ?: ""
+        set(value) = securePrefs.edit().putString(KEY_USER_AGE, value.trim()).apply()
+
+    var userDob: String
+        get() = securePrefs.getString(KEY_USER_DOB, "") ?: ""
+        set(value) = securePrefs.edit().putString(KEY_USER_DOB, value.trim()).apply()
+
+    var userLocation: String
+        get() = securePrefs.getString(KEY_USER_LOCATION, "") ?: ""
+        set(value) = securePrefs.edit().putString(KEY_USER_LOCATION, value.trim()).apply()
+
+    var hasAcceptedAgreement: Boolean
+        get() = securePrefs.getBoolean(KEY_HAS_ACCEPTED_AGREEMENT, false)
+        set(value) = securePrefs.edit().putBoolean(KEY_HAS_ACCEPTED_AGREEMENT, value).apply()
+
     companion object {
         private const val KEY_API_KEY = "gemini_api_key"
         private const val KEY_ASSISTANT_NAME = "assistant_name"
@@ -215,5 +231,9 @@ class PreferenceManager(context: Context) {
         private const val KEY_USER_UID = "user_uid"
         private const val KEY_IS_BLOCKED = "is_user_blocked"
         private const val KEY_BLOCKED_REASON = "user_blocked_reason"
+        private const val KEY_USER_AGE = "user_age"
+        private const val KEY_USER_DOB = "user_dob"
+        private const val KEY_USER_LOCATION = "user_location"
+        private const val KEY_HAS_ACCEPTED_AGREEMENT = "has_accepted_agreement"
     }
 }

@@ -12,7 +12,12 @@
           "package_name": "com.aaya.assistant"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "309741886520-tt16rroviktcuduvr3jc8rtkeb43g66b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCGxHILtwIrbBMaaw1Q5YgJgD4YCAH1rmc"

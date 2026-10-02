@@ -84,14 +84,20 @@ class TextToSpeechManager(
         }
 
         try {
-            engine.setLanguage(targetLocale)
+            val res = engine.setLanguage(targetLocale)
+            if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
+                val fallback = engine.setLanguage(Locale("en", "IN"))
+                if (fallback == TextToSpeech.LANG_MISSING_DATA || fallback == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    engine.setLanguage(Locale.US)
+                }
+            }
         } catch (_: Exception) {
-            // Ignore
+            try { engine.setLanguage(Locale.getDefault()) } catch (_: Exception) {}
         }
 
         val preset = prefs.voicePreset.uppercase(Locale.ROOT)
         val (pitch, speed) = when (preset) {
-            "FEMALE" -> Pair(1.08f, 1.02f)
+            "FEMALE" -> Pair(1.15f, 1.02f)
             "MALE" -> Pair(0.85f, 0.95f)
             "CHILD" -> Pair(1.35f, 1.05f)
             "OLD_MAN" -> Pair(0.72f, 0.85f)
@@ -100,33 +106,6 @@ class TextToSpeechManager(
             else -> Pair(1.05f, 1.0f)
         }
         setPitchAndSpeed(pitch, speed)
-
-        // Attempt actual neural voice selection if supported
-        try {
-            val availableVoices = engine.voices
-            if (!availableVoices.isNullOrEmpty()) {
-                val matchedVoice = when (preset) {
-                    "FEMALE" -> availableVoices.firstOrNull { v ->
-                        val n = v.name.lowercase(Locale.ROOT)
-                        (v.locale.country == "IND" || v.locale.language in listOf("hi", "en")) &&
-                                (n.contains("female") || n.contains("hie") || n.contains("end") || n.contains("network"))
-                    }
-                    "MALE" -> availableVoices.firstOrNull { v ->
-                        val n = v.name.lowercase(Locale.ROOT)
-                        (v.locale.country == "IND" || v.locale.language in listOf("hi", "en")) &&
-                                (n.contains("male") || n.contains("hic") || n.contains("enc"))
-                    }
-                    else -> availableVoices.firstOrNull { v ->
-                        v.locale.country == "IND" || v.locale.language in listOf("hi", "en")
-                    }
-                }
-                if (matchedVoice != null) {
-                    engine.voice = matchedVoice
-                }
-            }
-        } catch (_: Exception) {
-            // Fallback to pitch modulation
-        }
     }
 
     fun setVoicePreset(preset: String) {
@@ -164,11 +143,6 @@ class TextToSpeechManager(
             // Normalize multiple whitespaces
             .replace(Regex("\\s+"), " ")
             .trim()
-
-        // If speaking in Hindi mode, guide phonetics
-        if (prefs.selectedLanguage.equals("HINDI", ignoreCase = true)) {
-            clean = clean.replace(Regex("(?i)\\bAaya\\b"), "आया")
-        }
 
         return clean
     }
