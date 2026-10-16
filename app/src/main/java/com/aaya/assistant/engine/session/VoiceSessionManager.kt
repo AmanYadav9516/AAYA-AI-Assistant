@@ -265,6 +265,10 @@ class VoiceSessionManager(
         override fun onEvent(eventType: Int, params: Bundle?) {}
     }
 
+    fun processManualCommand(command: String) {
+        processCommand(command)
+    }
+
     private fun processCommand(command: String) {
         setState(VoiceState.PROCESSING)
         _streamingTranscript.value = "\"$command\""
@@ -331,11 +335,11 @@ class VoiceSessionManager(
                 lastResultRequiresFollowup = false
                 isFollowUpPromptTurn = false
                 Log.d(TAG, "Clarification required: Resuming listening for user's choice.")
-                startCommandListening()
+                startVoiceSession()
             } else if (isFollowUpPromptTurn) {
                 isFollowUpPromptTurn = false
                 Log.d(TAG, "Follow-up prompt finished: Listening for 5s silence window...")
-                startCommandListening()
+                startVoiceSession()
             } else {
                 val userName = prefs.userName.ifBlank { "Aman" }
                 val prompt = if (prefs.selectedLanguage.equals("HINDI", ignoreCase = true)) {

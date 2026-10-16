@@ -139,8 +139,8 @@ class AudioMixerEngine private constructor(private val context: Context) {
 
             for (i in 0 until numBands) {
                 val pct = preset.bandLevelsPercent.getOrNull(i) ?: 0
-                // Convert percentage (-100 to 100) to actual millibels
-                val level = ((pct / 100f) * (if (pct >= 0) maxEq else -minEq)).toInt()
+                val targetSpan = if (pct >= 0) maxEq.toFloat() else (-minEq.toInt()).toFloat()
+                val level = ((pct / 100f) * targetSpan).toInt()
                 eq.setBandLevel(i.toShort(), level.coerceIn(minEq.toInt(), maxEq.toInt()).toShort())
             }
         } catch (e: Exception) {

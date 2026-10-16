@@ -261,7 +261,7 @@ private fun SiriFloatingCard(
                             when {
                                 actionSummary == "Audio Jam Studio" -> NeonCyan.copy(alpha = 0.2f)
                                 voiceState == VoiceState.LISTENING_COMMAND -> NeonCyan.copy(alpha = 0.15f)
-                                voiceState == VoiceState.PROCESSING, voiceState == VoiceState.EXECUTING -> ElectricViolet.copy(alpha = 0.2f)
+                                voiceState == VoiceState.PROCESSING || voiceState == VoiceState.EXECUTING -> ElectricViolet.copy(alpha = 0.2f)
                                 voiceState == VoiceState.SPEAKING -> RadiantPurple.copy(alpha = 0.2f)
                                 else -> CardBorder.copy(alpha = 0.3f)
                             }
@@ -283,7 +283,7 @@ private fun SiriFloatingCard(
                         color = when {
                             actionSummary == "Audio Jam Studio" -> NeonCyan
                             voiceState == VoiceState.LISTENING_COMMAND -> NeonCyan
-                            voiceState == VoiceState.PROCESSING, voiceState == VoiceState.EXECUTING -> ElectricViolet
+                            voiceState == VoiceState.PROCESSING || voiceState == VoiceState.EXECUTING -> ElectricViolet
                             voiceState == VoiceState.SPEAKING -> RadiantPurple
                             else -> TextSecondary
                         }
