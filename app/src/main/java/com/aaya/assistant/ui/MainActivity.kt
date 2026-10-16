@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
     private var assistantState by mutableStateOf(AssistantState())
     private var audioLevelRms by mutableFloatStateOf(0f)
     private var showVoiceSheet by mutableStateOf(false)
+    private var showAayaTunes by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -150,7 +151,10 @@ class MainActivity : ComponentActivity() {
                     assistantState = assistantState,
                     audioLevelRms = audioLevelRms,
                     showVoiceSheet = showVoiceSheet,
+                    showAayaTunes = showAayaTunes,
                     ttsManager = ttsManager,
+                    onOpenAayaTunes = { showAayaTunes = true },
+                    onCloseAayaTunes = { showAayaTunes = false },
                     onToggleVoiceSession = { toggleVoiceListening() },
                     onStopSpeech = { ttsManager.stop() },
                     onSuggestionClicked = { suggestion ->
@@ -177,6 +181,9 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra(EXTRA_TRIGGER_VOICE, false) == true) {
             showVoiceSheet = true
             startVoiceListening()
+        }
+        if (intent?.getStringExtra("OPEN_SCREEN") == "AAYA_TUNES") {
+            showAayaTunes = true
         }
     }
 
@@ -228,7 +235,10 @@ fun MainAppScaffold(
     assistantState: AssistantState,
     audioLevelRms: Float,
     showVoiceSheet: Boolean,
+    showAayaTunes: Boolean = false,
     ttsManager: TextToSpeechManager,
+    onOpenAayaTunes: () -> Unit = {},
+    onCloseAayaTunes: () -> Unit = {},
     onToggleVoiceSession: () -> Unit,
     onStopSpeech: () -> Unit,
     onSuggestionClicked: (String) -> Unit,
@@ -258,6 +268,20 @@ fun MainAppScaffold(
                 showAgreementDialog = false
             }
         )
+    }
+
+    if (showAayaTunes) {
+        com.aaya.assistant.ui.music.AayaTunesScreen(
+            onBack = onCloseAayaTunes,
+            onOpenAudioJam = {
+                val triggerIntent = Intent(app, com.aaya.assistant.ui.trigger.VoiceTriggerActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                app.voiceSessionManager.processManualCommand("start jam")
+                app.startActivity(triggerIntent)
+            }
+        )
+        return
     }
 
     if (app.preferenceManager.isUserBlocked) {
@@ -356,6 +380,7 @@ fun MainAppScaffold(
                     nextTask = scheduledTasks.firstOrNull(),
                     onOrbClick = onToggleVoiceSession,
                     onOpenFeature = { query -> onSuggestionClicked(query) },
+                    onOpenAayaTunes = onOpenAayaTunes,
                     onNavigateToHub = { currentNavIndex = 1 },
                     onOpenVoiceStudio = { showVoiceCustomizer = true },
                     onOpenFestivalCard = { fest -> selectedFestivalForDialog = fest },
@@ -446,6 +471,7 @@ fun HomeScreen(
     nextTask: ScheduledTask?,
     onOrbClick: () -> Unit,
     onOpenFeature: (String) -> Unit,
+    onOpenAayaTunes: () -> Unit,
     onNavigateToHub: () -> Unit,
     onOpenVoiceStudio: () -> Unit,
     onOpenFestivalCard: (com.aaya.assistant.data.model.FestivalModel) -> Unit,
@@ -735,6 +761,23 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text("Quick Actions", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    QuickActionCard(
+                        title = "AAYA Tunes",
+                        subtitle = "Cloud Music & EQ",
+                        icon = Icons.Default.MusicNote,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenAayaTunes
+                    )
+                    QuickActionCard(
+                        title = "Audio Jam",
+                        subtitle = "Multi-Device Sync",
+                        icon = Icons.Default.Podcasts,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onOpenFeature("stream my music") }
+                    )
+                }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     QuickActionCard(

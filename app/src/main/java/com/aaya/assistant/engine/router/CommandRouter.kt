@@ -26,7 +26,8 @@ import java.util.*
 data class ExecutionResult(
     val speechResponse: String,
     val actionSummary: String? = null,
-    val handledLocally: Boolean = false
+    val handledLocally: Boolean = false,
+    val requiresFollowupAnswer: Boolean = false
 )
 
 class CommandRouter(
@@ -39,6 +40,16 @@ class CommandRouter(
     private val db = AayaDatabase.getInstance(context)
     private val prefs = PreferenceManager(context)
     private val usagePoliceManager = com.aaya.assistant.engine.wellness.UsagePoliceManager(context)
+
+    sealed class PendingAction {
+        data class ConfirmCall(val contactName: String, val phoneNumber: String) : PendingAction()
+        data class DisambiguateCall(val candidates: List<Pair<String, String>>) : PendingAction()
+    }
+
+    private var activePendingAction: PendingAction? = null
+
+    fun hasPendingClarification(): Boolean = activePendingAction != null
+    fun clearPendingClarification() { activePendingAction = null }
 
     suspend fun routeAndExecute(rawSpokenText: String): ExecutionResult = withContext(Dispatchers.IO) {
         val query = rawSpokenText.trim()
@@ -68,6 +79,57 @@ class CommandRouter(
 
     private suspend fun executeSingleRoute(query: String): ExecutionResult = withContext(Dispatchers.IO) {
         val lower = query.lowercase()
+
+        // -1. Check Active Pending Clarification (Disambiguate Call or Confirm Action)
+        activePendingAction?.let { pending ->
+            when (pending) {
+                is PendingAction.DisambiguateCall -> {
+                    val q = lower.trim()
+                    val selectedIndex = when {
+                        q.contains("first") || q.contains("pehla") || q.contains("1") || q.contains("one") -> 0
+                        q.contains("second") || q.contains("dusra") || q.contains("2") || q.contains("two") -> 1
+                        q.contains("third") || q.contains("teesra") || q.contains("3") || q.contains("three") -> 2
+                        q.contains("fourth") || q.contains("chautha") || q.contains("4") || q.contains("four") -> 3
+                        else -> {
+                            pending.candidates.indexOfFirst { candidate ->
+                                q.contains(candidate.first.lowercase()) || candidate.first.lowercase().contains(q)
+                            }
+                        }
+                    }
+
+                    if (selectedIndex in pending.candidates.indices) {
+                        val chosen = pending.candidates[selectedIndex]
+                        activePendingAction = null
+                        val msg = "Calling ${chosen.first}."
+                        speak(msg)
+                        deviceController.placeCall(chosen.second)
+                        logAudit("CALL", "Placed call to ${chosen.first}")
+                        return@withContext ExecutionResult(msg, "Call -> ${chosen.first}", handledLocally = true)
+                    } else if (q.contains("cancel") || q.contains("nahi") || q.contains("no") || q.contains("stop") || q.contains("mat")) {
+                        activePendingAction = null
+                        val msg = "Call cancel kar di."
+                        speak(msg)
+                        return@withContext ExecutionResult(msg, "Call Canceled", handledLocally = true)
+                    }
+                }
+                is PendingAction.ConfirmCall -> {
+                    val q = lower.trim()
+                    if (q.contains("yes") || q.contains("haan") || q.contains("ha") || q.contains("call") || q.contains("laga do") || q.contains("kar do")) {
+                        activePendingAction = null
+                        val msg = "Calling ${pending.contactName}."
+                        speak(msg)
+                        deviceController.placeCall(pending.phoneNumber)
+                        logAudit("CALL", "Placed call to ${pending.contactName}")
+                        return@withContext ExecutionResult(msg, "Call -> ${pending.contactName}", handledLocally = true)
+                    } else if (q.contains("no") || q.contains("nahi") || q.contains("cancel") || q.contains("mat")) {
+                        activePendingAction = null
+                        val msg = "Call cancel kar di."
+                        speak(msg)
+                        return@withContext ExecutionResult(msg, "Call Canceled", handledLocally = true)
+                    }
+                }
+            }
+        }
 
         // 0. Voice Screenshot & Global Navigation Actions
         if (lower.contains("screenshot") || lower.contains("screen shot")) {
@@ -414,16 +476,24 @@ class CommandRouter(
 
             val match = contactMatcher.resolveAndFindContact(target)
             if (match != null) {
-                if (match.confidence >= 0.95f) {
+                if (match.candidateList.size > 1) {
+                    val candidates = match.candidateList
+                    activePendingAction = PendingAction.DisambiguateCall(candidates)
+                    val optionsFormatted = candidates.mapIndexed { idx, pair -> "${idx + 1}. ${pair.first}" }.joinToString(", ")
+                    val msg = "Mujhe ${candidates.size} contacts mile: $optionsFormatted. Kisse call milau?"
+                    speak(msg)
+                    return@withContext ExecutionResult(msg, "Select: $optionsFormatted", handledLocally = true, requiresFollowupAnswer = true)
+                } else if (match.confidence >= 0.95f) {
                     val msg = "Calling ${match.contactName}."
                     speak(msg)
                     deviceController.placeCall(match.phoneNumber)
                     logAudit("CALL", "Placed call to ${match.contactName}")
                     return@withContext ExecutionResult(msg, "Call -> ${match.contactName}", handledLocally = true)
                 } else if (match.needsConfirmation) {
+                    activePendingAction = PendingAction.ConfirmCall(match.contactName, match.phoneNumber)
                     val msg = "I found ${match.contactName}. Should I call?"
                     speak(msg)
-                    return@withContext ExecutionResult(msg, "Confirm call -> ${match.contactName}", handledLocally = true)
+                    return@withContext ExecutionResult(msg, "Confirm call -> ${match.contactName}", handledLocally = true, requiresFollowupAnswer = true)
                 }
             }
         }
@@ -608,7 +678,31 @@ class CommandRouter(
             return@withContext ExecutionResult(callInfo, "Last Call Query", handledLocally = true)
         }
 
-        // 20. FAST LOCAL ROUTE: Music Player (Local Library vs YouTube)
+        // 20. FAST LOCAL ROUTE: AAYA Jam & Audio Streaming Studio (Zero-Lag Sync)
+        if (lower.contains("stream my music") || lower.contains("stream music") ||
+            lower.contains("start jam") || lower.contains("audio jam") || lower.contains("music jam") ||
+            lower.contains("jam session") || lower.contains("jam mode") || lower.contains("connect devices") ||
+            lower.contains("multi device audio") || lower.contains("jam chalao")) {
+            val msg = "AAYA Audio Jam Studio is active. Turning on broadcast hotspot. Please connect nearby devices to this Wi-Fi to sync playback with zero lag."
+            speak(msg)
+            logAudit("JAM", "Audio Jam Studio Started")
+            return@withContext ExecutionResult(msg, "Audio Jam Studio", handledLocally = true)
+        }
+
+        // 20b. FAST LOCAL ROUTE: AAYA Tunes & Cloud Music
+        if (lower.contains("aaya tunes") || lower.contains("aaya music") || lower.contains("cloud music") || lower.contains("online music")) {
+            val msg = "Opening AAYA Tunes Music Studio."
+            speak(msg)
+            val intent = android.content.Intent(context, com.aaya.assistant.ui.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("OPEN_SCREEN", "AAYA_TUNES")
+            }
+            context.startActivity(intent)
+            logAudit("MEDIA", "Opened AAYA Tunes")
+            return@withContext ExecutionResult(msg, "AAYA Tunes", handledLocally = true)
+        }
+
+        // 20c. FAST LOCAL ROUTE: Music Player (Local Library vs YouTube)
         if (lower == "play music" || lower == "music chalao" || lower == "open music" || lower == "local music" ||
             lower == "offline music" || lower.contains("phone ke gaane") || lower.contains("mera gaana") ||
             lower.contains("music player") || lower.contains("phone music")) {

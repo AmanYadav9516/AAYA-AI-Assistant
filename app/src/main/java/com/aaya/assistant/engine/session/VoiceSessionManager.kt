@@ -90,6 +90,8 @@ class VoiceSessionManager(
     private var audioFocusRequest: AudioFocusRequest? = null
     private var silenceTimerRunnable: Runnable? = null
     private var hasSpeechStarted = false
+    private var lastResultRequiresFollowup = false
+    private var isFollowUpPromptTurn = false
 
     init {
         ttsManager.addCallback(this)
@@ -267,20 +269,40 @@ class VoiceSessionManager(
         setState(VoiceState.PROCESSING)
         _streamingTranscript.value = "\"$command\""
 
+        val lower = command.lowercase().trim()
+        if (isFollowUpPromptTurn || _voiceState.value == VoiceState.LISTENING_COMMAND) {
+            if (lower == "no" || lower == "nahi" || lower == "nothing" || lower == "kuch nahi" ||
+                lower == "bas" || lower == "sleep" || lower == "so jao" || lower == "bye" || lower == "thanks" || lower == "thank you") {
+                val goodbye = if (prefs.selectedLanguage.equals("HINDI", ignoreCase = true)) "Theek hai, main sleep mode me ja rahi hoon." else "Okay, going to sleep."
+                speakResponse(goodbye)
+                mainHandler.postDelayed({ returnToSleep() }, 1800)
+                return
+            }
+        }
+
         scope.launch {
             try {
                 setState(VoiceState.EXECUTING)
                 val result = commandRouter.routeCommand(command)
                 _actionSummary.value = result.actionSummary
                 _responseText.value = result.speechResponse
+                lastResultRequiresFollowup = result.requiresFollowupAnswer
 
                 // Speak response if available
                 if (result.speechResponse.isNotBlank()) {
                     speakResponse(result.speechResponse)
                 } else {
                     // Action executed without speech (e.g. Flashlight toggled, Screenshot taken)
-                    // Keep result visible for 2.2s then return to sleep
-                    mainHandler.postDelayed({ returnToSleep() }, 2200)
+                    mainHandler.postDelayed({
+                        val userName = prefs.userName.ifBlank { "Aman" }
+                        val prompt = if (prefs.selectedLanguage.equals("HINDI", ignoreCase = true)) {
+                            "Mr. $userName, aur koi kaam mere liye?"
+                        } else {
+                            "Mr. $userName, any other help for me?"
+                        }
+                        isFollowUpPromptTurn = true
+                        speakResponse(prompt)
+                    }, 2200)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error executing command: $command", e)
@@ -303,10 +325,28 @@ class VoiceSessionManager(
     }
 
     override fun onSpeechFinished() {
-        Log.d(TAG, "TTS speech finished. Smoothly closing overlay and going to sleep.")
-        mainHandler.postDelayed({
-            returnToSleep()
-        }, 1200)
+        Log.d(TAG, "TTS speech finished. State handling...")
+        mainHandler.post {
+            if (lastResultRequiresFollowup || commandRouter.hasPendingClarification()) {
+                lastResultRequiresFollowup = false
+                isFollowUpPromptTurn = false
+                Log.d(TAG, "Clarification required: Resuming listening for user's choice.")
+                startCommandListening()
+            } else if (isFollowUpPromptTurn) {
+                isFollowUpPromptTurn = false
+                Log.d(TAG, "Follow-up prompt finished: Listening for 5s silence window...")
+                startCommandListening()
+            } else {
+                val userName = prefs.userName.ifBlank { "Aman" }
+                val prompt = if (prefs.selectedLanguage.equals("HINDI", ignoreCase = true)) {
+                    "Mr. $userName, aur koi kaam mere liye?"
+                } else {
+                    "Mr. $userName, any other help for me?"
+                }
+                isFollowUpPromptTurn = true
+                speakResponse(prompt)
+            }
+        }
     }
 
     override fun onSpeechError(error: String) {
@@ -322,6 +362,9 @@ class VoiceSessionManager(
      */
     fun returnToSleep() {
         Log.d(TAG, "returnToSleep() executed. Standby mode active.")
+        lastResultRequiresFollowup = false
+        isFollowUpPromptTurn = false
+        commandRouter.clearPendingClarification()
         cancelSilenceCountdown()
         destroyRecognizer()
         abandonAudioDucking()

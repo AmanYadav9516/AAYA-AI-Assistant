@@ -11,7 +11,8 @@ data class ContactMatchResult(
     val confidence: Float,
     val relationshipMatched: String? = null,
     val needsConfirmation: Boolean = false,
-    val alternativeMatches: List<String> = emptyList()
+    val alternativeMatches: List<String> = emptyList(),
+    val candidateList: List<Pair<String, String>> = emptyList()
 )
 
 class MultilingualContactMatcher(private val context: Context) {
@@ -95,7 +96,8 @@ class MultilingualContactMatcher(private val context: Context) {
                 confidence = 0.75f,
                 relationshipMatched = matchedRelationKey,
                 needsConfirmation = true,
-                alternativeMatches = partialMatches.take(3).map { it.first }
+                alternativeMatches = partialMatches.take(4).map { it.first },
+                candidateList = partialMatches.take(4)
             )
         }
 

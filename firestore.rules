@@ -25,5 +25,13 @@ service cloud.firestore {
       // 4. DELETE: Client deletion disabled to prevent ban evasion
       allow delete: if false;
     }
+
+    match /songs/{songId} {
+      // 1. READ: Public read for everyone so any app user or guest can stream songs
+      allow read: if true;
+
+      // 2. WRITE: Allow create, update, delete only for authenticated users
+      allow create, update, delete: if request.auth != null;
+    }
   }
 }
