@@ -65,29 +65,27 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat << 'EOF' > release_notes.md
-          ## 🌟 AAYA v3.4.0 — New 3D Identity, Scheduled SMS, Firebase $0 Backend & Voice Upgrade
+          ## 🌟 AAYA v3.4.1 — AAYA'S SYSTUM, Zero-Install Audio Jam, Dynamic Wallpaper Studio & Smart Dynamic Island
 
           ### 📲 Direct 1-Click Download Links:
-          * **[Download AAYA v3.4.0 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.4.0/app-debug.apk)**
-          * **[Download AAYA v3.4.0 AAB (Google Play Store Bundle)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.4.0/AAYA-Assistant.aab)**
-          * **[Download AAYA v3.4.0 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.4.0/AAYA-Assistant.zip)**
+          * **[Download AAYA v3.4.1 APK](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.4.1/app-debug.apk)**
+          * **[Download AAYA v3.4.1 AAB (Google Play Store Bundle)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.4.1/AAYA-Assistant.aab)**
+          * **[Download AAYA v3.4.1 ZIP (WhatsApp & Mobile Friendly)](https://github.com/AmanYadav9516/AAYA-AI-Assistant/releases/download/v3.4.1/AAYA-Assistant.zip)**
 
-          ### 🚀 What's New in v3.4.0:
-          - 🎨 **New Official 3D Logo Icon**: Premium 3D blue-cyan gradient "A" emblem on obsidian squircle across all app launcher icons and web assets.
-          - 💖 **3D Claymorphic Login Experience**: Soft 3D companion character, 1-tap Google Sign-In, and Guest Mode offline bypass.
-          - 🎙️ **Voice Articulation & Pronunciation Upgrade**: Eliminates "A - A - Y - A" letter-by-letter spelling. Natural bilingual Indian pronunciation for Hindi, English, and Hinglish. Working voice filters.
-          - 🛡️ **Permanent Fresh Install Startup Crash Elimination**: Android 14 foreground microphone service guarded until runtime permission is confirmed.
-          - ⏰ **Scheduled SMS with AI Wishes & Emojis**: Schedule messages to contacts at any date/time (12 AM midnight, 5 PM, 10:30 AM) with automated emoji wishes in Hindi/Hinglish/English and high-priority delivery alerts.
-          - 🧠 **Memory & Task Recall**: Seamlessly answers "what is my mom name", "college time", and "today's tasks".
-          - ☀️ **Realme/ColorOS Brightness & Volume Fix**: Hardware commands take precedence over Android settings.
-          - 🗺️ **Visual Photo Search & Route Navigation**: Direct Google Images search and Google Maps turn-by-turn driving routes.
-          - ☁️ **$0 Firebase User Management**: Live user tracking, daily request counting, and admin block control via Firebase Console.
+          ### 🚀 What's New in v3.4.1:
+          - 🎛️ **AAYA'S SYSTUM Central Hub**: Dedicated high-performance control center tab organizing Audio Jam, Wallpaper Studio, AAYA Tunes, and Performance Booster with zero lag and cyber-neon styling.
+          - 📡 **Zero-Install Audio Jam (WebCast + QR Code)**: Integrated local HTTP WebCast server (`:8080`) with animated radar sweep and dynamic QR code. Friends and nearby devices (Android, iPhone, PC, Mac, TV) **do NOT need AAYA installed**—scan QR code to stream instantly in Chrome/Safari!
+          - 🎨 **Dynamic Wallpaper Studio (1-Tap Apply)**: Curated 4K collections (*AMOLED Dark, Cyberpunk, Aesthetic Lo-Fi, Anime 3D, Devotional, Nature, Minimalist*). 1-tap direct apply to Home/Lock/Both screens via Android `WallpaperManager` without saving to gallery. Voice trigger: *"Hey AAYA, change my wallpaper"*.
+          - 🏝️ **Ambient Dynamic Island Music Pill**: Sleek floating capsule widget with spinning vinyl, live track details, and instant play/pause controls above bottom navigation.
+          - ⚡ **Battery & Device Performance Booster**: Voice commands (*"Hey AAYA, optimize my phone"*, *"phone clean karo"*) to free RAM, run GC, check battery status, and report results in Hindi/English voice.
+          - 🌅 **Bilingual Smart Morning Briefing**: Voice command (*"Good morning AAYA"*, *"Subah bakhair"*) gives personalized morning update with user name, today's date, pending reminders, and Daily Inspiration Quote.
+          - 🎵 **Multi-Format Offline Local Music Scanner in AAYA Tunes**: Automatically scans internal storage for **MP3, MPEG, M4A, AAC, WAV, FLAC, and OGG** under "Device Storage (Local)".
           EOF
 
-          gh release delete v3.4.0 --yes || true
-          gh release create v3.4.0 \
+          gh release delete v3.4.1 --yes || true
+          gh release create v3.4.1 \
             app/build/outputs/apk/debug/app-debug.apk \
             AAYA-Assistant.aab \
             AAYA-Assistant.zip \
-            --title "AAYA AI Assistant v3.4.0 APK & AAB (3D Visual Identity, Scheduled SMS & $0 Backend)" \
+            --title "AAYA AI Assistant v3.4.1 APK & AAB (AAYA'S SYSTUM, Audio Jam QR WebCast & Wallpaper Studio)" \
             --notes-file release_notes.md

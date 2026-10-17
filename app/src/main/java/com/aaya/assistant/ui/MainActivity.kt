@@ -41,6 +41,10 @@ import com.aaya.assistant.ui.notes.NotesAndScheduleScreen
 import com.aaya.assistant.ui.permissions.PermissionWizardScreen
 import com.aaya.assistant.ui.settings.ApiSettingsScreen
 import com.aaya.assistant.ui.settings.VoiceCustomizerDialog
+import com.aaya.assistant.ui.systum.AayaSystumScreen
+import com.aaya.assistant.ui.wallpaper.WallpaperStudioScreen
+import com.aaya.assistant.ui.music.AudioJamDialog
+import com.aaya.assistant.ui.assistant.AmbientMusicPill
 import com.aaya.assistant.ui.theme.*
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -57,6 +61,9 @@ class MainActivity : ComponentActivity() {
     private var audioLevelRms by mutableFloatStateOf(0f)
     private var showVoiceSheet by mutableStateOf(false)
     private var showAayaTunes by mutableStateOf(false)
+    private var showWallpaperStudio by mutableStateOf(false)
+    private var showAudioJamDialog by mutableStateOf(false)
+    private var currentNavIndex by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -152,9 +159,17 @@ class MainActivity : ComponentActivity() {
                     audioLevelRms = audioLevelRms,
                     showVoiceSheet = showVoiceSheet,
                     showAayaTunes = showAayaTunes,
+                    showWallpaperStudio = showWallpaperStudio,
+                    showAudioJamDialog = showAudioJamDialog,
+                    currentNavIndex = currentNavIndex,
+                    onNavIndexChange = { currentNavIndex = it },
                     ttsManager = ttsManager,
                     onOpenAayaTunes = { showAayaTunes = true },
                     onCloseAayaTunes = { showAayaTunes = false },
+                    onOpenWallpaperStudio = { showWallpaperStudio = true },
+                    onCloseWallpaperStudio = { showWallpaperStudio = false },
+                    onOpenAudioJam = { showAudioJamDialog = true },
+                    onCloseAudioJam = { showAudioJamDialog = false },
                     onToggleVoiceSession = { toggleVoiceListening() },
                     onStopSpeech = { ttsManager.stop() },
                     onSuggestionClicked = { suggestion ->
@@ -182,8 +197,11 @@ class MainActivity : ComponentActivity() {
             showVoiceSheet = true
             startVoiceListening()
         }
-        if (intent?.getStringExtra("OPEN_SCREEN") == "AAYA_TUNES") {
-            showAayaTunes = true
+        when (intent?.getStringExtra("OPEN_SCREEN")) {
+            "AAYA_TUNES" -> showAayaTunes = true
+            "WALLPAPER_STUDIO" -> showWallpaperStudio = true
+            "AUDIO_JAM" -> showAudioJamDialog = true
+            "AAYA_SYSTUM" -> currentNavIndex = 1
         }
     }
 
@@ -236,9 +254,17 @@ fun MainAppScaffold(
     audioLevelRms: Float,
     showVoiceSheet: Boolean,
     showAayaTunes: Boolean = false,
+    showWallpaperStudio: Boolean = false,
+    showAudioJamDialog: Boolean = false,
+    currentNavIndex: Int = 0,
+    onNavIndexChange: (Int) -> Unit = {},
     ttsManager: TextToSpeechManager,
     onOpenAayaTunes: () -> Unit = {},
     onCloseAayaTunes: () -> Unit = {},
+    onOpenWallpaperStudio: () -> Unit = {},
+    onCloseWallpaperStudio: () -> Unit = {},
+    onOpenAudioJam: () -> Unit = {},
+    onCloseAudioJam: () -> Unit = {},
     onToggleVoiceSession: () -> Unit,
     onStopSpeech: () -> Unit,
     onSuggestionClicked: (String) -> Unit,
@@ -247,8 +273,7 @@ fun MainAppScaffold(
     val app = AayaApplication.instance
     var showLoginScreen by remember { mutableStateOf(!app.preferenceManager.isLoggedIn && !app.preferenceManager.isGuestUser) }
     var showAgreementDialog by remember { mutableStateOf(!app.preferenceManager.hasAcceptedAgreement) }
-    val initialNav = if (!app.preferenceManager.isInitialSetupDone) 3 else 0
-    var currentNavIndex by remember { mutableIntStateOf(initialNav) }
+    var showPermissionsSetup by remember { mutableStateOf(!app.preferenceManager.isInitialSetupDone) }
     val scope = rememberCoroutineScope()
 
     if (showLoginScreen) {
@@ -270,18 +295,31 @@ fun MainAppScaffold(
         )
     }
 
-    if (showAayaTunes) {
-        com.aaya.assistant.ui.music.AayaTunesScreen(
-            onBack = onCloseAayaTunes,
-            onOpenAudioJam = {
-                val triggerIntent = Intent(app, com.aaya.assistant.ui.trigger.VoiceTriggerActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                }
-                app.voiceSessionManager.processManualCommand("start jam")
-                app.startActivity(triggerIntent)
+    if (showPermissionsSetup) {
+        com.aaya.assistant.ui.permissions.PermissionWizardScreen(
+            onAllGranted = {
+                app.preferenceManager.isInitialSetupDone = true
+                showPermissionsSetup = false
             }
         )
         return
+    }
+
+    if (showWallpaperStudio) {
+        WallpaperStudioScreen(onBack = onCloseWallpaperStudio)
+        return
+    }
+
+    if (showAayaTunes) {
+        com.aaya.assistant.ui.music.AayaTunesScreen(
+            onBack = onCloseAayaTunes,
+            onOpenAudioJam = onOpenAudioJam
+        )
+        return
+    }
+
+    if (showAudioJamDialog) {
+        AudioJamDialog(onDismiss = onCloseAudioJam)
     }
 
     if (app.preferenceManager.isUserBlocked) {
@@ -297,7 +335,7 @@ fun MainAppScaffold(
         if (showVoiceSheet) {
             onDismissVoiceSheet()
         } else if (currentNavIndex != 0) {
-            currentNavIndex = 0
+            onNavIndexChange(0)
         }
     }
 
@@ -335,31 +373,41 @@ fun MainAppScaffold(
             ) {
                 NavigationBarItem(
                     selected = currentNavIndex == 0,
-                    onClick = { currentNavIndex = 0 },
+                    onClick = { onNavIndexChange(0) },
                     icon = { Icon(Icons.Default.GraphicEq, contentDescription = "AAYA") },
                     label = { Text("Assistant", fontSize = 10.sp) }
                 )
                 NavigationBarItem(
                     selected = currentNavIndex == 1,
-                    onClick = { currentNavIndex = 1 },
+                    onClick = { onNavIndexChange(1) },
+                    icon = {
+                        BadgedBox(
+                            badge = {
+                                Badge(containerColor = NeonCyan) {
+                                    Text("PRO", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = DeepIndigoBg)
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Tune, contentDescription = "SYSTUM", tint = if (currentNavIndex == 1) NeonCyan else TextSecondary)
+                        }
+                    },
+                    label = { Text("SYSTUM", fontSize = 10.sp, fontWeight = if (currentNavIndex == 1) FontWeight.Bold else FontWeight.Normal) }
+                )
+                NavigationBarItem(
+                    selected = currentNavIndex == 2,
+                    onClick = { onNavIndexChange(2) },
                     icon = { Icon(Icons.Default.EventNote, contentDescription = "Hub") },
                     label = { Text("Hub", fontSize = 10.sp) }
                 )
                 NavigationBarItem(
-                    selected = currentNavIndex == 2,
-                    onClick = { currentNavIndex = 2 },
+                    selected = currentNavIndex == 3,
+                    onClick = { onNavIndexChange(3) },
                     icon = { Icon(Icons.Default.Psychology, contentDescription = "Memory") },
                     label = { Text("Memory", fontSize = 10.sp) }
                 )
                 NavigationBarItem(
-                    selected = currentNavIndex == 3,
-                    onClick = { currentNavIndex = 3 },
-                    icon = { Icon(Icons.Default.Shield, contentDescription = "Permissions") },
-                    label = { Text("Access", fontSize = 10.sp) }
-                )
-                NavigationBarItem(
                     selected = currentNavIndex == 4,
-                    onClick = { currentNavIndex = 4 },
+                    onClick = { onNavIndexChange(4) },
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                     label = { Text("Settings", fontSize = 10.sp) }
                 )
@@ -381,12 +429,20 @@ fun MainAppScaffold(
                     onOrbClick = onToggleVoiceSession,
                     onOpenFeature = { query -> onSuggestionClicked(query) },
                     onOpenAayaTunes = onOpenAayaTunes,
-                    onNavigateToHub = { currentNavIndex = 1 },
+                    onOpenSystum = { onNavIndexChange(1) },
+                    onOpenWallpapers = onOpenWallpaperStudio,
+                    onOpenAudioJam = onOpenAudioJam,
+                    onNavigateToHub = { onNavIndexChange(2) },
                     onOpenVoiceStudio = { showVoiceCustomizer = true },
                     onOpenFestivalCard = { fest -> selectedFestivalForDialog = fest },
                     onSpeakQuote = { quoteText -> ttsManager.speak(quoteText) }
                 )
-                1 -> NotesAndScheduleScreen(
+                1 -> AayaSystumScreen(
+                    onOpenTunes = onOpenAayaTunes,
+                    onOpenWallpapers = onOpenWallpaperStudio,
+                    onSpeakText = { ttsManager.speak(it) }
+                )
+                2 -> NotesAndScheduleScreen(
                     notes = notes,
                     shoppingList = shoppingList,
                     expenses = expenses,
@@ -415,7 +471,7 @@ fun MainAppScaffold(
                         }
                     }
                 )
-                2 -> MemoryDashboardScreen(
+                3 -> MemoryDashboardScreen(
                     memories = memories,
                     routines = routines,
                     vipContacts = vips,
@@ -425,17 +481,38 @@ fun MainAppScaffold(
                     onAddMemory = { k, v, cat -> scope.launch { app.database.aayaDao().insertMemory(MemoryItem(category = cat, key = k, value = v)) } },
                     onAddVip = { name, phone, rel -> scope.launch { app.database.aayaDao().insertVipContact(VipContact(name = name, phoneNumber = phone, relationship = rel)) } }
                 )
-                3 -> PermissionWizardScreen(
-                    onAllGranted = {
-                        app.preferenceManager.isInitialSetupDone = true
-                        currentNavIndex = 0
-                    }
-                )
                 4 -> ApiSettingsScreen(
                     onLogout = {
                         showLoginScreen = true
                     }
                 )
+            }
+
+            // Ambient Dynamic Island Music Pill
+            val musicPlayer = remember { AayaMusicPlayer.getInstance(app) }
+            val currentSong by musicPlayer.currentSong.collectAsState()
+            val isMusicPlaying by musicPlayer.isPlaying.collectAsState()
+            val jamServer = remember { AudioJamServer.getInstance() }
+            val isJamActive by jamServer.isBroadcasting.collectAsState()
+
+            if (currentSong != null || isJamActive) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .align(Alignment.BottomCenter)
+                ) {
+                    AmbientMusicPill(
+                        currentSong = currentSong ?: com.aaya.assistant.data.model.SongItem(
+                            id = "jam_live",
+                            title = "Audio Jam Broadcasting",
+                            artist = "Local Wi-Fi Stream",
+                            audioUrl = ""
+                        ),
+                        isPlaying = isMusicPlaying || isJamActive,
+                        onOpenPlayer = onOpenAayaTunes
+                    )
+                }
             }
 
             // Floating Assistant Voice Overlay Sheet
@@ -472,6 +549,9 @@ fun HomeScreen(
     onOrbClick: () -> Unit,
     onOpenFeature: (String) -> Unit,
     onOpenAayaTunes: () -> Unit,
+    onOpenSystum: () -> Unit = {},
+    onOpenWallpapers: () -> Unit = {},
+    onOpenAudioJam: () -> Unit = {},
     onNavigateToHub: () -> Unit,
     onOpenVoiceStudio: () -> Unit,
     onOpenFestivalCard: (com.aaya.assistant.data.model.FestivalModel) -> Unit,
@@ -754,55 +834,144 @@ fun HomeScreen(
             }
         }
 
+        // AAYA'S SYSTUM Hero Showcase Card
+        item {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = GlassSurface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.5.dp,
+                        brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(NeonCyan, RadiantPurple, ElectricViolet)
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .clickable { onOpenSystum() }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(
+                                androidx.compose.ui.graphics.Brush.linearGradient(
+                                    listOf(NeonCyan, RadiantPurple)
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = DeepIndigoBg,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "AAYA'S SYSTUM",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Black,
+                                color = TextPrimary,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(NeonCyan.copy(alpha = 0.2f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text("STUDIO", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NeonCyan)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Audio Jam • Wallpapers • Tunes • Booster",
+                            fontSize = 11.sp,
+                            color = TextSecondary
+                        )
+                    }
+                    Text("Explore ➔", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NeonCyan)
+                }
+            }
+        }
+
         // Quick Command Tiles
         item {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("Quick Actions", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                Text("Zero-Lag Studio & Actions", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     QuickActionCard(
                         title = "AAYA Tunes",
-                        subtitle = "Cloud Music & EQ",
+                        subtitle = "Cloud & Local Audio",
                         icon = Icons.Default.MusicNote,
                         modifier = Modifier.weight(1f),
                         onClick = onOpenAayaTunes
                     )
                     QuickActionCard(
                         title = "Audio Jam",
-                        subtitle = "Multi-Device Sync",
+                        subtitle = "QR Code & Radar Sync",
                         icon = Icons.Default.Podcasts,
                         modifier = Modifier.weight(1f),
-                        onClick = { onOpenFeature("stream my music") }
+                        onClick = onOpenAudioJam
                     )
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     QuickActionCard(
+                        title = "Wallpapers",
+                        subtitle = "1-Tap Direct Apply",
+                        icon = Icons.Default.Wallpaper,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenWallpapers
+                    )
+                    QuickActionCard(
+                        title = "Speed Booster",
+                        subtitle = "Clean RAM & Battery",
+                        icon = Icons.Default.Speed,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onOpenFeature("optimize my phone") }
+                    )
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    QuickActionCard(
+                        title = "Morning Brief",
+                        subtitle = "Weather & Tasks",
+                        icon = Icons.Default.WbSunny,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onOpenFeature("good morning aaya") }
+                    )
+                    QuickActionCard(
                         title = "Hisab-Kitab",
-                        subtitle = "Log Expense ₹",
+                        subtitle = "Expense Tracker ₹",
                         icon = Icons.Default.AccountBalanceWallet,
                         modifier = Modifier.weight(1f),
                         onClick = { onOpenFeature("Kitna kharch hua aaj?") }
                     )
-                    QuickActionCard(
-                        title = "Take Photo",
-                        subtitle = "Camera Assistant",
-                        icon = Icons.Default.CameraAlt,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onOpenFeature("Take a photo") }
-                    )
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     QuickActionCard(
-                        title = "Flashlight",
-                        subtitle = "Toggle Torch",
-                        icon = Icons.Default.FlashlightOn,
+                        title = "Voice Camera",
+                        subtitle = "3s Hands-Free",
+                        icon = Icons.Default.CameraAlt,
                         modifier = Modifier.weight(1f),
-                        onClick = { onOpenFeature("Turn on flashlight") }
+                        onClick = { onOpenFeature("Take a photo") }
                     )
                     QuickActionCard(
                         title = "Emergency SOS",
@@ -810,23 +979,6 @@ fun HomeScreen(
                         icon = Icons.Default.Warning,
                         modifier = Modifier.weight(1f),
                         onClick = { onOpenFeature("SOS") }
-                    )
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickActionCard(
-                        title = "Shopping",
-                        subtitle = "Check List",
-                        icon = Icons.Default.ShoppingCart,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onOpenFeature("What is on my shopping list?") }
-                    )
-                    QuickActionCard(
-                        title = "Daily Plan",
-                        subtitle = "Classes & Alarms",
-                        icon = Icons.Default.CalendarToday,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onOpenFeature("Plan my day") }
                     )
                 }
             }

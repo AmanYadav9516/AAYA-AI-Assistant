@@ -683,8 +683,14 @@ class CommandRouter(
             lower.contains("start jam") || lower.contains("audio jam") || lower.contains("music jam") ||
             lower.contains("jam session") || lower.contains("jam mode") || lower.contains("connect devices") ||
             lower.contains("multi device audio") || lower.contains("jam chalao")) {
-            val msg = "AAYA Audio Jam Studio is active. Turning on broadcast hotspot. Please connect nearby devices to this Wi-Fi to sync playback with zero lag."
+            val isHindi = prefs.selectedLanguage.equals("HINDI", ignoreCase = true)
+            val msg = if (isHindi) "AAYA Audio Jam Studio open kar rahi hoon. Wi-Fi broadcast active hai." else "Opening AAYA Audio Jam Studio. Local zero-lag Wi-Fi broadcast is running."
             speak(msg)
+            val intent = android.content.Intent(context, com.aaya.assistant.ui.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("OPEN_SCREEN", "AUDIO_JAM")
+            }
+            context.startActivity(intent)
             logAudit("JAM", "Audio Jam Studio Started")
             return@withContext ExecutionResult(msg, "Audio Jam Studio", handledLocally = true)
         }
@@ -700,6 +706,55 @@ class CommandRouter(
             context.startActivity(intent)
             logAudit("MEDIA", "Opened AAYA Tunes")
             return@withContext ExecutionResult(msg, "AAYA Tunes", handledLocally = true)
+        }
+
+        // 20c. FAST LOCAL ROUTE: Dynamic Wallpaper Studio
+        if (lower.contains("wallpaper") || lower.contains("background photo") || lower.contains("lock screen photo")) {
+            val isHindi = prefs.selectedLanguage.equals("HINDI", ignoreCase = true)
+            val msg = if (isHindi) "AAYA Wallpaper Studio open kar rahi hoon." else "Opening AAYA Wallpaper Studio."
+            speak(msg)
+            val intent = android.content.Intent(context, com.aaya.assistant.ui.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("OPEN_SCREEN", "WALLPAPER_STUDIO")
+            }
+            context.startActivity(intent)
+            logAudit("WALLPAPER", "Opened Wallpaper Studio")
+            return@withContext ExecutionResult(msg, "Wallpaper Studio", handledLocally = true)
+        }
+
+        // 20d. FAST LOCAL ROUTE: AAYA'S SYSTUM Control Center
+        if (lower.contains("systum") || lower.contains("system") || lower.contains("control center")) {
+            val isHindi = prefs.selectedLanguage.equals("HINDI", ignoreCase = true)
+            val msg = if (isHindi) "AAYA'S SYSTUM Control Center open kar rahi hoon." else "Opening AAYA'S SYSTUM Control Center."
+            speak(msg)
+            val intent = android.content.Intent(context, com.aaya.assistant.ui.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("OPEN_SCREEN", "AAYA_SYSTUM")
+            }
+            context.startActivity(intent)
+            logAudit("SYSTEM", "Opened AAYA SYSTUM")
+            return@withContext ExecutionResult(msg, "AAYA'S SYSTUM", handledLocally = true)
+        }
+
+        // 20e. FAST LOCAL ROUTE: Battery & Performance Booster
+        if (lower.contains("optimize") || lower.contains("boost") || lower.contains("clean ram") ||
+            lower.contains("speed up") || lower.contains("phone saaf") || lower.contains("ram free")) {
+            val isHindi = prefs.selectedLanguage.equals("HINDI", ignoreCase = true)
+            val res = com.aaya.assistant.engine.device.DeviceBooster.optimizeDevice(context)
+            val speech = if (isHindi) res.messageHindi else res.messageEnglish
+            speak(speech)
+            logAudit("SYSTEM", "Cleaned ${res.freedMemoryMb}MB RAM, Battery ${res.batteryPct}%")
+            return@withContext ExecutionResult(speech, "Freed ${res.freedMemoryMb}MB RAM", handledLocally = true)
+        }
+
+        // 20f. FAST LOCAL ROUTE: Smart Morning Briefing
+        if (lower.contains("good morning") || lower == "morning" || lower.contains("subah bakhair") ||
+            lower.contains("shubh prabhat") || lower.contains("morning briefing") || lower.contains("aaj ka din")) {
+            val isHindi = prefs.selectedLanguage.equals("HINDI", ignoreCase = true)
+            val brief = com.aaya.assistant.engine.briefing.MorningBriefingManager.generateMorningBriefing(context, isHindi)
+            speak(brief)
+            logAudit("BRIEFING", "Smart Daily Briefing")
+            return@withContext ExecutionResult(brief, "Morning Briefing", handledLocally = true)
         }
 
         // 20c. FAST LOCAL ROUTE: Music Player (Local Library vs YouTube)

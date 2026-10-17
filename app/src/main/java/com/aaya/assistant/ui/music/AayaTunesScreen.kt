@@ -49,24 +49,42 @@ fun AayaTunesScreen(
     val progressMs by musicPlayer.progressMs.collectAsState()
     val durationMs by musicPlayer.durationMs.collectAsState()
 
+    var localSongs by remember { mutableStateOf<List<SongItem>>(emptyList()) }
     var selectedCategory by remember { mutableStateOf("All") }
     var showMixerDialog by remember { mutableStateOf(false) }
+    var showJamDialog by remember { mutableStateOf(false) }
     var showFullPlayerSheet by remember { mutableStateOf(false) }
 
-    val categories = listOf("All", "Lo-Fi & Chill", "Focus & Study", "Devotional / Bhakti", "Party & Bass Boost", "Hindi Melodies", "English Pop")
+    val categories = listOf("All", "Device Storage (Local)", "Lo-Fi & Chill", "Focus & Study", "Devotional / Bhakti", "Party & Bass Boost", "Hindi Melodies", "English Pop")
 
-    val filteredSongs = remember(songs, selectedCategory) {
-        if (selectedCategory == "All") songs else songs.filter { it.category == selectedCategory }
+    LaunchedEffect(Unit) {
+        localSongs = com.aaya.assistant.engine.audio.LocalMusicScanner.scanLocalAudioFiles(context)
     }
 
-    LaunchedEffect(songs) {
-        if (songs.isNotEmpty()) {
-            musicPlayer.setPlaylist(songs)
+    val allCombinedSongs = remember(songs, localSongs) {
+        songs + localSongs
+    }
+
+    val filteredSongs = remember(allCombinedSongs, selectedCategory, localSongs) {
+        when (selectedCategory) {
+            "All" -> allCombinedSongs
+            "Device Storage (Local)" -> localSongs
+            else -> allCombinedSongs.filter { it.category == selectedCategory }
+        }
+    }
+
+    LaunchedEffect(allCombinedSongs) {
+        if (allCombinedSongs.isNotEmpty()) {
+            musicPlayer.setPlaylist(allCombinedSongs)
         }
     }
 
     if (showMixerDialog) {
         AudioMixerDialog(onDismiss = { showMixerDialog = false })
+    }
+
+    if (showJamDialog) {
+        AudioJamDialog(onDismiss = { showJamDialog = false })
     }
 
     if (onBack != null) {
@@ -131,7 +149,10 @@ fun AayaTunesScreen(
 
                     // Audio Jam Button
                     Button(
-                        onClick = onOpenAudioJam,
+                        onClick = {
+                            showJamDialog = true
+                            onOpenAudioJam()
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
